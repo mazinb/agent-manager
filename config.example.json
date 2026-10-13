@@ -1,0 +1,39 @@
+{
+  "_comment": "Copy to ~/.config/agent-manager/config.json. Token comes from agent-manager/.env (AGENT_MANAGER_TOKEN), not here.",
+  "db_path": "~/.local/share/agent-manager/brain.db",
+  "rebuild_fts": true,
+  "llm": {
+    "base_url": "http://127.0.0.1:8888/v1",
+    "model": "GLM-5.3-Flash-EXL3"
+  },
+  "hosts": ["gb10", "gx10", "worker"],
+  "entities": {
+    "Mazin": {"type": "person", "blurb": "Owner"},
+    "hermes": {"type": "tool", "blurb": "Agent runtime"},
+    "cursor": {"type": "tool", "blurb": "Coding agent"},
+    "agent-manager": {"type": "project", "blurb": "bot.getzoro.com chat + brain + MCP"}
+  },
+  "sources": [
+    {
+      "type": "files",
+      "tag": "project_readme",
+      "roots": ["~/projects/*"],
+      "include": ["README.md"],
+      "max_depth": 2
+    },
+    {
+      "type": "files",
+      "tag": "rule",
+      "roots": ["~/projects/*"],
+      "include": [".cursor/rules/*.mdc"],
+      "max_depth": 3
+    },
+    {
+      "type": "memory",
+      "path": "~/.hermes/profiles/*/memories/MEMORY.md"
+    },
+    {
+      "type": "services"
+    }
+  ]
+}

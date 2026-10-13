@@ -1,0 +1,11 @@
+{
+  "name": "agent-manager-brain",
+  "version": "0.3.0",
+  "description": "Connect any agent to an agent-manager shared brain: MCP setup, search, ask, context packs, notes.",
+  "license": "MIT",
+  "type": "commonjs",
+  "bin": { "agent-manager-brain": "cli.js" },
+  "engines": { "node": ">=18" },
+  "repository": { "type": "git", "url": "https://github.com/mazinb/agent-manager" },
+  "keywords": ["agent-manager", "mcp", "agents", "context"]
+}

@@ -1,7 +1,7 @@
 {
   "name": "agent-manager",
-  "version": "0.1.0",
-  "description": "Shared brain for Cursor: recall project context, save decisions, and talk to per-project Hermes helpers via bot.getzoro.com.",
+  "version": "0.3.0",
+  "description": "Shared brain for Cursor: recall project context, save decisions, and chat with per-project Hermes helpers at bot.getzoro.com.",
   "author": {
     "name": "mazinb",
     "email": "mazin@getzoro.com"
@@ -26,18 +26,18 @@
   "variables": {
     "type": "object",
     "properties": {
-      "AGENT_CONTEXT_URL": {
+      "AGENT_MANAGER_URL": {
         "type": "string",
-        "title": "Brain MCP URL",
-        "description": "Streamable HTTP MCP endpoint for the shared brain. The free public space works with no account.",
-        "default": "https://bot.getzoro.com/space/mcp"
+        "title": "MCP URL",
+        "description": "Streamable HTTP MCP endpoint for your agent-manager brain.",
+        "default": "https://bot.getzoro.com/mcp"
       },
-      "AGENT_CONTEXT_TOKEN": {
+      "AGENT_MANAGER_TOKEN": {
         "type": "string",
-        "title": "Brain access token",
-        "description": "X-Token for a private self-hosted brain (https://bot.getzoro.com/context/mcp or http://localhost:8076/mcp). Leave empty for the free shared space."
+        "title": "Access token",
+        "description": "X-Token that unlocks bot.getzoro.com (same token as the dashboard)."
       }
     },
-    "required": ["AGENT_CONTEXT_URL"]
+    "required": ["AGENT_MANAGER_URL", "AGENT_MANAGER_TOKEN"]
   }
 }

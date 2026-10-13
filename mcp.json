@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "agent-manager": {
-      "url": "${AGENT_CONTEXT_URL}",
+      "url": "${AGENT_MANAGER_URL}",
       "headers": {
-        "X-Token": "${AGENT_CONTEXT_TOKEN}"
+        "X-Token": "${AGENT_MANAGER_TOKEN}"
       }
     }
   }

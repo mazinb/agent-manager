@@ -1,38 +1,32 @@
 # Cursor Marketplace submission
 
-This repo is a **single Cursor Plugin** (manifest at `.cursor-plugin/plugin.json`).
+Single Cursor Plugin. Manifest: `.cursor-plugin/plugin.json`.
 
 ## Checklist
 
-- [x] `.cursor-plugin/plugin.json` with unique kebab-case `name`: `agent-manager`
+- [x] Unique kebab-case `name`: `agent-manager`
 - [x] Clear `description`, `author`, `homepage`, `repository`, `license`, `keywords`
 - [x] `assets/logo.svg` referenced by relative path
-- [x] `mcp.json` uses `${AGENT_CONTEXT_URL}` / `${AGENT_CONTEXT_TOKEN}` only (no secrets)
-- [x] Variables declared in the manifest for every `${VAR}`
+- [x] `mcp.json` uses only `${AGENT_MANAGER_URL}` / `${AGENT_MANAGER_TOKEN}` (no secrets)
+- [x] Variables declared for every `${VAR}`
 - [x] Rules / skills / commands have valid YAML frontmatter
+- [x] Brain + dashboard live in this same repo (no `agent-context` dependency)
+- [x] Public `/space` removed — token-gated `/mcp` only
 - [x] `README.md` documents install + configuration
-- [x] Paths are relative (no `..`, no absolute paths)
 - [x] Public GitHub repo: `https://github.com/mazinb/agent-manager`
-- [x] Local install path: `~/.cursor/plugins/local/agent-manager` → this checkout
-- [ ] Local smoke test in Cursor UI: enable plugin, MCP tools list, `/recall` + `/remember`
+- [x] `python3 scripts/validate-plugin.py` passes
+- [ ] Cursor UI smoke test: enable plugin, tools/list, `/recall`, `/remember`
 - [ ] Submit at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish)
 
-## What reviewers get
+## Defaults
 
-| Piece | Path | Role |
-|---|---|---|
-| Manifest | `.cursor-plugin/plugin.json` | Plugin identity + variables |
-| MCP | `mcp.json` | HTTP brain → agent-context |
-| Always-on rule | `rules/agent-manager.mdc` | Prefer this brain over Adapter |
-| Skill | `skills/agent-manager/SKILL.md` | Recall / remember procedures |
-| Commands | `commands/recall.md`, `commands/remember.md` | `/recall`, `/remember` |
-| Dashboard (optional self-host) | `server.py`, `static/`, `install.sh` | https://bot.getzoro.com |
+| Variable | Default |
+|---|---|
+| `AGENT_MANAGER_URL` | `https://bot.getzoro.com/mcp` |
+| `AGENT_MANAGER_TOKEN` | *(required — set in Plugins → Configure)* |
 
-## Defaults for marketplace users
+## Team marketplace
 
-- **MCP URL default:** `https://bot.getzoro.com/space/mcp` (free shared space, no token)
-- **Private brain:** set `AGENT_CONTEXT_URL` to `https://bot.getzoro.com/context/mcp` (or self-hosted) and set `AGENT_CONTEXT_TOKEN` in Plugins → Configure
-
-## Team marketplace (private)
-
-On Teams/Enterprise: Dashboard → Plugins → Team Marketplaces → Import from Repo → paste this repository URL. Set installation mode to **Default On** or **Required** if you want every developer on agent-manager instead of Adapter.
+Dashboard → Plugins → Team Marketplaces → Import from Repo →
+`https://github.com/mazinb/agent-manager`. Prefer **Default On** or **Required**
+so Adapter is not competing for always-on memory.

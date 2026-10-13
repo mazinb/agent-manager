@@ -1,38 +1,45 @@
 #!/usr/bin/env python3
-"""Agent manager — web UI to chat with per-project Hermes helper agents.
+"""Agent manager — unified dashboard + shared brain + MCP.
 
-Serves static/index.html and a small JSON API. Auth via X-Token header
-matching AGENT_MANAGER_TOKEN from .env. Chat executes
-`hermes -p <agent> chat -q <message>` per request.
+One process on :8075:
+  /                 Hermes helper chat UI
+  /brain/           Shared brain UI
+  /api/agents|chat|history   chat API
+  /api/stats|search|ask|…    brain API
+  /mcp              streamable HTTP MCP
+
+Auth: single X-Token / Bearer vs AGENT_MANAGER_TOKEN (.env).
+No public /space — private brain only.
 """
+from __future__ import annotations
+
 import json
 import os
 import re
-import shlex
 import subprocess
+import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
+
+from agent_context import llm, mcp, pipeline, query, store  # noqa: E402
+from agent_context.server import Brain  # noqa: E402
+
 STATIC = os.path.join(ROOT, "static")
+BRAIN_STATIC = os.path.join(ROOT, "agent_context", "static")
 DATA = os.path.join(ROOT, "data")
 PROFILES = os.path.expanduser("~/.hermes/profiles")
 HERMES = os.path.expanduser("~/.local/bin/hermes")
 CHAT_TIMEOUT = int(os.environ.get("CHAT_TIMEOUT", "420"))
-
-# agent-context (shared brain) reverse proxy target
-BRAIN_CONFIG_PATH = os.path.expanduser("~/.config/agent-context/config.json")
-BRAIN_PORT = int(os.environ.get("AGENT_CONTEXT_PORT", "8076"))
-SPACE_PORT = int(os.environ.get("AGENT_CONTEXT_PUBLIC_PORT", "8077"))  # free public shared space (no auth)
-
-
-def brain_token():
-    try:
-        import json as _json
-        with open(BRAIN_CONFIG_PATH) as f:
-            return _json.load(f).get("token", "")
-    except Exception:
-        return ""
+CONFIG_PATH = os.environ.get(
+    "AGENT_MANAGER_CONFIG",
+    os.path.expanduser("~/.config/agent-manager/config.json"),
+)
+# Fall back to legacy agent-context config during migration
+LEGACY_CONFIG = os.path.expanduser("~/.config/agent-context/config.json")
 
 META_RE = re.compile(
     r"^(Session|Title|Duration|Messages|Cost|Model):.*$", re.MULTILINE)
@@ -50,8 +57,27 @@ def load_env():
     return env
 
 
+def load_brain_config():
+    path = CONFIG_PATH if os.path.isfile(CONFIG_PATH) else LEGACY_CONFIG
+    if not os.path.isfile(path):
+        return {
+            "db_path": os.path.expanduser(
+                "~/.local/share/agent-manager/brain.db"),
+            "sources": [],
+            "llm": {},
+        }
+    with open(path) as f:
+        cfg = json.load(f)
+    cfg["db_path"] = os.path.expanduser(cfg.get(
+        "db_path", "~/.local/share/agent-manager/brain.db"))
+    return cfg
+
+
 ENV = load_env()
-TOKEN = ENV.get("AGENT_MANAGER_TOKEN", "")
+TOKEN = ENV.get("AGENT_MANAGER_TOKEN", "") or os.environ.get(
+    "AGENT_MANAGER_TOKEN", "")
+BRAIN_CFG = load_brain_config()
+BRAIN = Brain(BRAIN_CFG)
 
 
 def list_agents():
@@ -84,7 +110,6 @@ def chat(agent, message):
     out = (proc.stdout or "").strip()
     err = (proc.stderr or "").strip()
     lines = out.splitlines()
-    # -Q prints just the reply; drop a trailing "session_id: ..." line.
     while lines and (META_RE.match(lines[-1]) or not lines[-1].strip()):
         lines.pop()
     reply = "\n".join(lines).strip() or err or "(empty reply)"
@@ -112,7 +137,7 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def _json(self, code, obj):
-        body = json.dumps(obj).encode()
+        body = json.dumps(obj, default=str).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -120,128 +145,177 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _authed(self):
-        return TOKEN and self.headers.get("X-Token") == TOKEN
+        if not TOKEN:
+            return True
+        if self.headers.get("X-Token") == TOKEN:
+            return True
+        return self.headers.get("Authorization", "") == f"Bearer {TOKEN}"
 
-    def _proxy_pass(self, port, rest, extra_token=None):
-        """Forward the current request to a local service on `port`."""
-        import urllib.request
-        import urllib.error
-        url = f"http://127.0.0.1:{port}{rest}"
-        length = int(self.headers.get("Content-Length", 0) or 0)
-        body = self.rfile.read(length) if length else None
-        req = urllib.request.Request(url, data=body, method=self.command)
-        for h in ("Content-Type",):
-            if self.headers.get(h):
-                req.add_header(h, self.headers[h])
-        if extra_token:
-            req.add_header("X-Token", extra_token)
-        try:
-            with urllib.request.urlopen(req, timeout=600) as resp:
-                data = resp.read()
-                ctype = resp.headers.get("Content-Type", "application/json")
-                code = resp.status
-        except urllib.error.HTTPError as e:
-            data = e.read()
-            ctype = e.headers.get("Content-Type", "application/json")
-            code = e.code
-        except Exception:
-            return self._json(502, {"error": "upstream unreachable"})
-        self.send_response(code)
+    def _file(self, path, ctype):
+        if not os.path.isfile(path):
+            return self._json(404, {"error": "not found"})
+        body = open(path, "rb").read()
+        self.send_response(200)
         self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(data)
+        self.wfile.write(body)
 
-    def _proxy_brain(self):
-        """Forward /context/* to the local agent-context server, swapping auth.
-        Client must present the agent-manager token; the brain receives its own.
-        """
-        if self.path.split("?")[0] == "/context/":
-            shell = True  # static shell only — no data without token
-        else:
-            shell = False
-        if not shell and not self._authed():
-            return self._json(401, {"error": "unauthorized"})
-        rest = self.path[len("/context"):] or "/"
-        self._proxy_pass(BRAIN_PORT, rest, extra_token=brain_token())
+    def do_HEAD(self):
+        # Enough for redirects / static probes; body omitted by callers that only need headers.
+        self.do_GET()
 
     def do_GET(self):
-        if self.path == "/context":
+        u = urlparse(self.path)
+        path = u.path
+        q = parse_qs(u.query)
+
+        # redirects
+        if path == "/context":
             self.send_response(301)
-            self.send_header("Location", "/context/")
+            self.send_header("Location", "/brain/")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if self.path.startswith("/context/"):
-            return self._proxy_brain()
-        if self.path == "/space":
+        if path.startswith("/context/"):
+            rest = path[len("/context"):] or "/"
             self.send_response(301)
-            self.send_header("Location", "/space/")
+            self.send_header("Location", "/brain" + rest + (
+                f"?{u.query}" if u.query else ""))
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if self.path.startswith("/space/"):
-            # free public shared space — no auth by design
-            return self._proxy_pass(SPACE_PORT, self.path[len("/space"):] or "/")
-        if self.path in ("/", "/index.html"):
-            return self._static("index.html")
-        if self.path.startswith("/api/agents"):
-            if not self._authed():
-                return self._json(401, {"error": "unauthorized"})
+        if path in ("/space", "/space/") or path.startswith("/space/"):
+            return self._json(410, {
+                "error": "gone",
+                "message": "Public /space was removed. Use /mcp with a token.",
+            })
+
+        # UIs
+        if path in ("/", "/index.html"):
+            return self._file(os.path.join(STATIC, "index.html"),
+                              "text/html; charset=utf-8")
+        if path in ("/brain", "/brain/"):
+            return self._file(os.path.join(BRAIN_STATIC, "index.html"),
+                              "text/html; charset=utf-8")
+
+        # MCP discovery
+        if path == "/mcp":
+            return self._json(200, {
+                "server": "agent-manager",
+                "version": "0.3.0",
+                "transport": "streamable-http (POST JSON-RPC to /mcp)",
+                "tools": [t["name"] for t in mcp.TOOLS],
+            })
+
+        if not self._authed():
+            return self._json(401, {"error": "unauthorized"})
+
+        # Chat API
+        if path == "/api/agents":
             return self._json(200, {"agents": list_agents()})
-        m = re.fullmatch(r"/api/history\?agent=([\w-]+)", self.path)
-        if m:
-            if not self._authed():
-                return self._json(401, {"error": "unauthorized"})
-            if not valid_agent(m.group(1)):
+        if path == "/api/history":
+            agent = (q.get("agent") or [""])[0]
+            if not valid_agent(agent):
                 return self._json(400, {"error": "bad agent"})
-            return self._json(200, {"history": read_history(m.group(1))})
+            return self._json(200, {"history": read_history(agent)})
+
+        # Brain API
+        if path == "/api/stats":
+            return self._json(200, query.stats(BRAIN.con))
+        if path == "/api/search":
+            return self._json(200, {"results": query.search(
+                BRAIN.con, (q.get("q") or [""])[0])})
+        if path == "/api/entity":
+            card = query.entity_card(BRAIN.con, (q.get("name") or [""])[0])
+            return self._json(200, card or {"error": "unknown"})
+        if path == "/api/entities":
+            rows = BRAIN.con.execute(
+                "SELECT name, type, blurb FROM entities ORDER BY type, name"
+            ).fetchall()
+            return self._json(200, {"entities": [dict(r) for r in rows]})
+        if path == "/api/projects":
+            return self._json(200, {"projects": query.projects(BRAIN.con)})
+        if path == "/api/context":
+            project = (q.get("project") or [""])[0]
+            if project not in query.projects(BRAIN.con):
+                return self._json(404, {"error": "unknown project"})
+            pack = query.context_pack(
+                BRAIN.con, project,
+                int((q.get("max_chars") or ["6000"])[0]))
+            return self._json(200, {"project": project, "pack": pack})
+
         return self._json(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path.startswith("/context/"):
-            return self._proxy_brain()
-        if self.path.startswith("/space/"):
-            # free public shared space — no auth by design
-            return self._proxy_pass(SPACE_PORT, self.path[len("/space"):] or "/")
-        if self.path != "/api/chat":
+        path = urlparse(self.path).path
+
+        if path.startswith("/space"):
+            return self._json(410, {
+                "error": "gone",
+                "message": "Public /space was removed. Use /mcp with a token.",
+            })
+
+        if path not in ("/api/chat", "/api/ask", "/api/refresh",
+                        "/api/note", "/mcp"):
             return self._json(404, {"error": "not found"})
         if not self._authed():
             return self._json(401, {"error": "unauthorized"})
+
         try:
             length = int(self.headers.get("Content-Length", 0))
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
             return self._json(400, {"error": "bad json"})
-        agent = payload.get("agent", "")
-        message = (payload.get("message") or "").strip()
-        if not valid_agent(agent):
-            return self._json(400, {"error": "unknown agent"})
-        if not message:
-            return self._json(400, {"error": "empty message"})
-        append_history(agent, "user", message)
-        try:
-            reply, rc = chat(agent, message)
-        except subprocess.TimeoutExpired:
-            reply, rc = f"(timed out after {CHAT_TIMEOUT}s)", 124
-        except Exception as e:
-            reply, rc = f"(error: {e})", 1
-        append_history(agent, "assistant", reply)
-        return self._json(200, {"reply": reply, "rc": rc})
 
-    def _static(self, name):
-        path = os.path.join(STATIC, name)
-        if not os.path.isfile(path):
-            return self._json(404, {"error": "not found"})
-        body = open(path, "rb").read()
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        if path == "/mcp":
+            resp = mcp.handle(BRAIN, payload)
+            if resp is None:
+                return self._json(202, {})
+            return self._json(200, resp)
+
+        if path == "/api/chat":
+            agent = payload.get("agent", "")
+            message = (payload.get("message") or "").strip()
+            if not valid_agent(agent):
+                return self._json(400, {"error": "unknown agent"})
+            if not message:
+                return self._json(400, {"error": "empty message"})
+            append_history(agent, "user", message)
+            try:
+                reply, rc = chat(agent, message)
+            except subprocess.TimeoutExpired:
+                reply, rc = f"(timed out after {CHAT_TIMEOUT}s)", 124
+            except Exception as e:
+                reply, rc = f"(error: {e})", 1
+            append_history(agent, "assistant", reply)
+            return self._json(200, {"reply": reply, "rc": rc})
+
+        if path == "/api/note":
+            try:
+                return self._json(200, mcp.TOOL_FUNCS["note"](BRAIN, payload))
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+
+        if path == "/api/refresh":
+            return self._json(200, BRAIN.refresh())
+
+        qs = (payload.get("q") or "").strip()
+        if not qs:
+            return self._json(400, {"error": "empty q"})
+        chunks = query.search(BRAIN.con, qs)
+        answer = None
+        if payload.get("use_llm", True):
+            lc = BRAIN.config.get("llm") or {}
+            if lc.get("base_url"):
+                answer = llm.ask(lc["base_url"], lc.get("model", ""),
+                                 qs, chunks)
+        return self._json(200, {"answer": answer, "results": chunks})
 
 
 if __name__ == "__main__":
+    # Ensure DB exists / schema ready
+    store.connect(BRAIN_CFG["db_path"]).close()
     port = int(os.environ.get("AGENT_MANAGER_PORT", "8075"))
-    print(f"agent-manager on :{port}", flush=True)
+    print(f"agent-manager on :{port} (chat + brain + mcp)", flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

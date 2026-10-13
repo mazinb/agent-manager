@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-manager"
+version = "0.3.0"
+description = "Cursor plugin + dashboard + shared brain for agents. Self-hosted, stdlib-only Python, MCP over HTTP."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Mazin Biviji", email = "mazin@getzoro.com" }]
+keywords = ["agents", "mcp", "context", "knowledge-graph", "sqlite", "cursor", "hermes"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries",
+]
+urls = { Homepage = "https://bot.getzoro.com", Repository = "https://github.com/mazinb/agent-manager" }
+
+[project.scripts]
+agent-manager = "agent_context.cli:main"
+
+[tool.setuptools]
+packages = ["agent_context"]
+
+[tool.setuptools.package-data]
+agent_context = ["static/*"]
