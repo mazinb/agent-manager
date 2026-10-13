@@ -1,0 +1,43 @@
+{
+  "name": "agent-manager",
+  "version": "0.1.0",
+  "description": "Shared brain for Cursor: recall project context, save decisions, and talk to per-project Hermes helpers via bot.getzoro.com.",
+  "author": {
+    "name": "mazinb",
+    "email": "mazin@getzoro.com"
+  },
+  "homepage": "https://bot.getzoro.com",
+  "repository": "https://github.com/mazinb/agent-manager",
+  "license": "MIT",
+  "logo": "assets/logo.svg",
+  "keywords": [
+    "memory",
+    "knowledge",
+    "context",
+    "mcp",
+    "agents",
+    "hermes",
+    "getzoro"
+  ],
+  "rules": "./rules",
+  "skills": "./skills",
+  "commands": "./commands",
+  "mcpServers": "./mcp.json",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "AGENT_CONTEXT_URL": {
+        "type": "string",
+        "title": "Brain MCP URL",
+        "description": "Streamable HTTP MCP endpoint for the shared brain. The free public space works with no account.",
+        "default": "https://bot.getzoro.com/space/mcp"
+      },
+      "AGENT_CONTEXT_TOKEN": {
+        "type": "string",
+        "title": "Brain access token",
+        "description": "X-Token for a private self-hosted brain (https://bot.getzoro.com/context/mcp or http://localhost:8076/mcp). Leave empty for the free shared space."
+      }
+    },
+    "required": ["AGENT_CONTEXT_URL"]
+  }
+}

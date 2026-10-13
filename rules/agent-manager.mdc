@@ -1,0 +1,35 @@
+---
+description: Use the agent-manager shared brain (MCP server "agent-manager") as long-term memory across sessions instead of Adapter or ad-hoc notes.
+alwaysApply: true
+---
+
+The `agent-manager` MCP server is this machine's shared brain (backed by agent-context). Prefer it over Adapter or inventing local memory.
+
+Dashboard: https://bot.getzoro.com — chat with per-project Hermes helpers. Private brain UI: https://bot.getzoro.com/context/ . Free public shared space: https://bot.getzoro.com/space/ .
+
+## Recall
+Before acting on something that may have prior context (a past decision, convention, or earlier problem), query the brain instead of guessing:
+
+- `ask` for a synthesized, cited answer.
+- `search` for matching chunks / notes.
+- `context_pack` with `project` set to the current repo/project slug when you need an injectable pack.
+- `entity` when you have a concrete name (service, port, model, person).
+- `projects` / `stats` to see what the brain already holds.
+
+Query when it is relevant, not on every message. An empty brain is normal for a new project; proceed and write results back as you go.
+
+## Remember
+At the end of a unit of work, save what should outlive the session with `note`:
+
+- Set `project` to a stable lowercase slug for the repo or agent (e.g. `voice-tutor`, `agent-manager`).
+- `title`: short and specific (`decision: auth via github`, `outcome: marketplace plugin scaffold`).
+- `body`: Markdown — for a decision include context, choice, reasoning, and rejected alternatives; for a task outcome include what changed, where, and how it was verified.
+
+Do not save secrets, tokens, `.env` contents, transient chat, or file contents that already live in the repository.
+
+## Scope
+- Private brain (`/context` or self-hosted): full ingested docs + notes for your stack.
+- Public space (`/space`): notes only, visible to anyone — never put private material there.
+
+## Conflict
+If both Adapter and agent-manager are installed, prefer agent-manager for recall/remember on this workspace.
