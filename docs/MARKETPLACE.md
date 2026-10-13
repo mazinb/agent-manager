@@ -12,8 +12,9 @@ This repo is a **single Cursor Plugin** (manifest at `.cursor-plugin/plugin.json
 - [x] Rules / skills / commands have valid YAML frontmatter
 - [x] `README.md` documents install + configuration
 - [x] Paths are relative (no `..`, no absolute paths)
-- [ ] Public GitHub repo: `https://github.com/mazinb/agent-manager`
-- [ ] Local smoke test: install plugin, MCP tools list, `/recall` + `/remember`
+- [x] Public GitHub repo: `https://github.com/mazinb/agent-manager`
+- [x] Local install path: `~/.cursor/plugins/local/agent-manager` → this checkout
+- [ ] Local smoke test in Cursor UI: enable plugin, MCP tools list, `/recall` + `/remember`
 - [ ] Submit at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish)
 
 ## What reviewers get
