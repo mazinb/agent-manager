@@ -49,6 +49,25 @@ npx --yes agent-manager-brain serve
 
 Full platform steps: **[docs/CONNECT.md](docs/CONNECT.md)**.
 
+### npm ↔ repo sync
+
+The npm package is a thin wrapper — `serve`/`init`/`setup` clone this repo at
+runtime, so brain features always come from GitHub and can't go stale. Only
+`npm/cli.js`, `npm/README.md` and the API routes the CLI calls are frozen at
+publish time. Check drift any time with:
+
+```bash
+scripts/npm-sync-check.sh   # exit 0 = in sync, 1 = republish needed
+```
+
+It diffs the published tarball against `npm/` and verifies every CLI-called
+endpoint still exists in `server.py`. Republish only when it says so:
+
+```bash
+# bump "version" in npm/package.json, commit, then:
+cd npm && npm publish
+```
+
 ## Changelog
 
 - **2026-10-14** — Brain page visual restyle: plain list rows with dividers, no
