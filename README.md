@@ -90,6 +90,10 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-14** — Connect page is edge-static: inlined CSS (no second
+  Spark hop for `/static/app.css`), `Cache-Control` so Cloudflare can
+  serve `/connect/` without the tunnel, one-click Cursor CTA + secondary
+  agents under a details panel. Setup/home/css get the same edge cache.
 - **2026-10-14** — Brain chrome snappy pass: sticky header+tabs+per-tab
   controls (no layout hop on load), parallel boot, Packs auto-load on
   select, plain private/public toggle (no emoji). **Bugfix:** POST
