@@ -367,6 +367,21 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/inbox/agents":
             return self._json(200,
                               {"agents": store.list_agents(BRAIN.con)})
+        if path == "/api/inbox/messages":
+            to_agent = (q.get("to") or q.get("to_agent") or [None])[0]
+            agent = (q.get("from") or q.get("agent") or [None])[0]
+            project = (q.get("project") or [None])[0]
+            try:
+                limit = int((q.get("limit") or ["50"])[0])
+            except ValueError:
+                limit = 50
+            if not to_agent and not agent:
+                return self._json(400, {
+                    "error": "pass to= (recipient) and/or from= (sender)"})
+            return self._json(200, {
+                "messages": store.list_peer_messages(
+                    BRAIN.con, to_agent=to_agent, agent=agent,
+                    project=project, limit=limit)})
         if path == "/api/stats":
             return self._json(200, query.stats(BRAIN.con))
         if path == "/api/search":

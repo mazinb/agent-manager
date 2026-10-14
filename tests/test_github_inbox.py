@@ -171,6 +171,45 @@ class GrokAgentPeers(unittest.TestCase):
         self.assertEqual(rows[1]["preview"], "first line")
 
 
+class PeerInbox(unittest.TestCase):
+    """Simpler than A2A: message_peer + peer_inbox on the shared peers bus."""
+
+    def test_message_peer_defaults_to_peers_project(self):
+        con = fresh_con()
+        out = mcp._message_peer(_Brain(con), {
+            "agent": "hermes", "to_agent": "cursor",
+            "body": "pytest green; please commit",
+        })
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["project"], "peers")
+        self.assertEqual(out["agent"], "hermes")
+        self.assertEqual(out["to_agent"], "cursor")
+        n = store.list_notes(con, "peers")[0]
+        self.assertEqual(n["body"], "pytest green; please commit")
+
+    def test_peer_inbox_filters_by_to_agent(self):
+        con = fresh_con()
+        mcp._message_peer(_Brain(con), {
+            "agent": "hermes", "to_agent": "cursor", "body": "for cursor"})
+        mcp._message_peer(_Brain(con), {
+            "agent": "cursor", "to_agent": "hermes", "body": "for hermes",
+            "title": "reply"})
+        mcp._note(_Brain(con), {
+            "project": "peers", "title": "solo", "body": "no peer",
+            "agent": "hermes"})
+        mine = mcp._peer_inbox(_Brain(con), {"to_agent": "hermes"})
+        self.assertEqual(len(mine["messages"]), 1)
+        self.assertEqual(mine["messages"][0]["body"], "for hermes")
+        self.assertEqual(mine["messages"][0]["agent"], "cursor")
+
+    def test_message_peer_requires_both_sides(self):
+        con = fresh_con()
+        with self.assertRaises(ValueError):
+            mcp._message_peer(_Brain(con), {"to_agent": "x", "body": "hi"})
+        with self.assertRaises(ValueError):
+            mcp._message_peer(_Brain(con), {"agent": "x", "body": "hi"})
+
+
 class GithubSignIn(unittest.TestCase):
     def test_scope_is_read_only_minimal(self):
         url = github_login.build_authorize_url("cid", "https://x/cb", "st")

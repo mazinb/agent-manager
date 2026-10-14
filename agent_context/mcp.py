@@ -158,6 +158,49 @@ def _add_note(brain, args):
     return _note(brain, args)
 
 
+def _message_peer(brain, args):
+    """Grok-style peer ping: write a note with agent → to_agent on the bus.
+
+    Default project is `peers` (shared inbox thread). Visible as
+    Messaged ● peer in /setup/. Prefer this over A2A for coordination."""
+    agent = (args.get("agent") or "").strip()
+    to_agent = (args.get("to_agent") or "").strip()
+    body = (args.get("body") or args.get("message") or "").strip()
+    if not agent:
+        raise ValueError("agent is required (your name, e.g. hermes)")
+    if not to_agent:
+        raise ValueError("to_agent is required (peer name, e.g. cursor)")
+    if not body:
+        raise ValueError("body is required")
+    title = (args.get("title") or "").strip()
+    if not title:
+        title = f"to-{to_agent}-{int(__import__('time').time())}"
+    return _note(brain, {
+        "project": (args.get("project") or "peers").strip() or "peers",
+        "title": title[:200],
+        "body": body,
+        "origin": "ai",
+        "agent": agent,
+        "to_agent": to_agent,
+        "confidence": args.get("confidence"),
+        "sources": args.get("sources"),
+    })
+
+
+def _peer_inbox(brain, args):
+    """Messages addressed to you (or sent by you) on the peer bus."""
+    from . import store
+    to_agent = (args.get("to_agent") or args.get("for") or "").strip() or None
+    agent = (args.get("agent") or args.get("from") or "").strip() or None
+    project = (args.get("project") or "").strip() or None
+    if not to_agent and not agent:
+        raise ValueError("pass to_agent (your name) and/or agent (sender)")
+    msgs = store.list_peer_messages(
+        brain.con, to_agent=to_agent, agent=agent,
+        project=project, limit=args.get("limit", 50))
+    return {"messages": msgs, "count": len(msgs)}
+
+
 TOOLS = [
     {"name": "search", "description": "Full-text + entity search over the shared brain. "
      "Stale notes (based-on source changed) are excluded unless include_stale.",
@@ -248,13 +291,39 @@ TOOLS = [
              "max_words": {"type": "integer"}}},
          },
          "required": ["project", "config"]}},
+    {"name": "message_peer", "description": "Message another agent on the "
+     "shared peers bus (Grok-style). Writes a note with agent → to_agent; "
+     "shows as Messaged ● peer in the inbox. Prefer this over A2A for "
+     "coordination — no JSON-RPC, no agent card.",
+     "inputSchema": {"type": "object", "properties": {
+         "agent": {"type": "string",
+                   "description": "Your name (e.g. hermes, grok-bot)."},
+         "to_agent": {"type": "string",
+                     "description": "Peer to message (e.g. cursor, dr-eggbot)."},
+         "body": {"type": "string",
+                  "description": "Message text (alias: message)."},
+         "message": {"type": "string"},
+         "title": {"type": "string"},
+         "project": {"type": "string", "default": "peers",
+                     "description": "Thread; default peers."}},
+         "required": ["agent", "to_agent", "body"]}},
+    {"name": "peer_inbox", "description": "Read peer-bus messages for you "
+     "(to_agent=you) and/or from a sender. Newest first.",
+     "inputSchema": {"type": "object", "properties": {
+         "to_agent": {"type": "string",
+                     "description": "Recipient filter (your name)."},
+         "agent": {"type": "string",
+                   "description": "Sender filter."},
+         "project": {"type": "string"},
+         "limit": {"type": "integer", "default": 50}},
+         "required": []}},
 ]
 
 TOOL_FUNCS = {t["name"]: f for t, f in zip(
     TOOLS, [_search, _ask, _entity, _context_pack, _projects, _stats, _note,
             _add_note, _list_projects, _get_project_summary,
             _refresh_project_summary, _get_autonote_config,
-            _set_autonote_config])}
+            _set_autonote_config, _message_peer, _peer_inbox])}
 
 
 def handle(brain, msg):

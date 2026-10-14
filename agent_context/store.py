@@ -365,6 +365,31 @@ def list_agents(con):
     return [{"agent": k, "notes": by[k]} for k in sorted(by, key=lambda a: (-by[a], a))]
 
 
+def list_peer_messages(con, to_agent=None, agent=None, project=None, limit=50):
+    """Peer-bus messages: notes that have a to_agent (Grok Messaged lines).
+
+    Filter by recipient (to_agent) and/or sender (agent). Newest first.
+    Simpler than A2A — just notes on a shared thread the inbox already shows."""
+    to_slug = _slug_agent(to_agent) if to_agent else None
+    from_slug = _slug_agent(agent) if agent else None
+    try:
+        limit = max(1, min(int(limit or 50), 200))
+    except (TypeError, ValueError):
+        limit = 50
+    out = []
+    for n in list_notes(con, project):
+        if not n.get("to_agent"):
+            continue
+        if to_slug and n["to_agent"] != to_slug:
+            continue
+        if from_slug and n["agent"] != from_slug:
+            continue
+        out.append(n)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def prune_stale(con, live_paths):
     """Delete sources no longer on disk. Notes (kind='note') never live on
     disk — they are agent-written rows — so they are always protected.

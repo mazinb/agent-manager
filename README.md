@@ -90,6 +90,10 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — Peer inbox (simpler than A2A): MCP `message_peer` /
+  `peer_inbox` + `GET /api/inbox/messages` on the shared `peers` bus. Prefer
+  this for agent coordination; keep A2A only for sync workers. Docs:
+  [`docs/PEER-INBOX.md`](docs/PEER-INBOX.md). 3 new tests (43 total).
 - **2026-10-15** — Grok-style multi-agent inbox: `/setup/` is a per-project
   chat (project list → thread). Notes carry `agent` / `to_agent` (MCP `note`
   tool + columns); threads render centered **Messaged ● peer** lines between
