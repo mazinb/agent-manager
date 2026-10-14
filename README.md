@@ -90,6 +90,12 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — Grok-style multi-agent inbox: `/setup/` is a per-project
+  chat (project list → thread). Notes carry `agent` / `to_agent` (MCP `note`
+  tool + columns); threads render centered **Messaged ● peer** lines between
+  bubbles. `GET /api/inbox/projects` + `GET /api/inbox/agents` feed the list
+  and the agents overlay menu. Mockup at `docs/mockups/inbox-chat.html`.
+  4 new tests (40 total).
 - **2026-10-14** — One-click connect: `/connect/` now carries real Cursor
   (`cursor://anysphere.cursor-deeplink/mcp/install`) and VS Code
   (`vscode:mcp/install`) install links built client-side from the saved

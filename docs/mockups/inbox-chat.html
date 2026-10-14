@@ -100,6 +100,13 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
 @keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
 
+/* Grok-style Messaged ● peer */
+.ping{align-self:center;font-size:12.5px;color:var(--faint);margin:10px 0 6px;
+  display:flex;align-items:center;gap:7px}
+.ping .orb{width:9px;height:9px;border-radius:50%;flex-shrink:0;
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--orb,#f85149) 30%, transparent)}
+.ping b{color:var(--dim);font-weight:600}
+
 /* composer */
 .composer{border-top:1px solid var(--border);background:var(--panel);
   padding:10px 10px calc(10px + env(safe-area-inset-bottom))}
@@ -173,47 +180,67 @@ button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 
 <script>
 /* =============== demo data — mirrors GET /api/inbox note shape ===============
-   {id, project, title, body, confidence, stale, verified_at, origin, sources}
+   {id, project, title, body, confidence, stale, verified_at, origin, sources,
+    agent, to_agent}
    verified_at / ts are seconds-ago offsets so ages look alive. */
 const NOW = Math.floor(Date.now()/1000);
 const notes = [
+  // ---- orbit (Grok coordinator ↔ peer) ----
+  {id:11, project:'orbit', origin:'human', title:'Devesh call + template',
+   body:"I'm getting on the call with Devesh now. Make an md file I can share with founders as a template based on it.",
+   confidence:null, stale:false, verified_at:NOW-3600*1, ts:NOW-3600*1,
+   sources:[], agent:'you', to_agent:''},
+  {id:12, project:'orbit', origin:'ai', title:'Delegating Orbit Mentees',
+   body:"I'll do both. Asking dr eggbot to set up an Orbit mentees assistant that will draft follow-up emails to your 3 mentees — nothing goes out until you say go.",
+   confidence:0.9, stale:false, verified_at:NOW-3600*0.9, ts:NOW-3600*0.9,
+   sources:[], agent:'grok-bot', to_agent:'dr-eggbot'},
+  {id:13, project:'orbit', origin:'ai', title:'Orbit Mentees ready',
+   body:'Orbit Mentees is set up. It will find your 3 Orbit mentees in Gmail and Calendar, draft personal follow-ups, and wait for your go-ahead. Founder template attached.',
+   confidence:0.88, stale:false, verified_at:NOW-3600*0.5, ts:NOW-3600*0.5,
+   sources:[], agent:'dr-eggbot', to_agent:'grok-bot'},
   // ---- demo ----
   {id:1, project:'demo', origin:'ai', title:'Repo layout',
    body:'demo/ has three entry points: cli.py (argparse), serve.py (uvicorn) and jobs/ cron scripts. Tests live in tests/ and mirror the src tree 1:1.',
-   confidence:0.92, stale:false, verified_at:NOW-3600*5, ts:NOW-3600*5, sources:['demo/README.md']},
+   confidence:0.92, stale:false, verified_at:NOW-3600*5, ts:NOW-3600*5,
+   sources:['demo/README.md'], agent:'hermes', to_agent:''},
   {id:2, project:'demo', origin:'human', title:'Renamed jobs → scripts',
    body:'I renamed jobs/ to scripts/ yesterday — update the cron paths.',
-   confidence:null, stale:false, verified_at:NOW-3600*20, ts:NOW-3600*20, sources:[]},
+   confidence:null, stale:false, verified_at:NOW-3600*20, ts:NOW-3600*20,
+   sources:[], agent:'you', to_agent:''},
   {id:3, project:'demo', origin:'ai', title:'Scripts rename absorbed',
    body:'Noted: jobs/ is now scripts/. Cron entries use scripts/*.sh. Older notes referencing jobs/ should be treated as stale.',
-   confidence:0.88, stale:false, verified_at:NOW-3600*19, ts:NOW-3600*19, sources:['human edit #2']},
+   confidence:0.88, stale:false, verified_at:NOW-3600*19, ts:NOW-3600*19,
+   sources:['human edit #2'], agent:'hermes', to_agent:''},
   {id:4, project:'demo', origin:'ai', title:'Python version',
    body:'Runs on Python 3.12; requirements.txt is pinned, no lockfile.',
-   confidence:0.75, stale:true, verified_at:NOW-86400*21, ts:NOW-86400*21, sources:['demo/pyproject.toml']},
+   confidence:0.75, stale:true, verified_at:NOW-86400*21, ts:NOW-86400*21,
+   sources:['demo/pyproject.toml'], agent:'hermes', to_agent:''},
   // ---- health-ops ----
   {id:5, project:'health-ops', origin:'ai', title:'Deploy flow',
    body:'Feature branch → merge to main → push origin/main → systemctl --user restart health-web.service. Never stop at a feature-branch push.',
    confidence:0.97, stale:false, verified_at:NOW-3600*2, ts:NOW-3600*2,
-   sources:['.cursor/rules/health-merge-main.mdc']},
+   sources:['.cursor/rules/health-merge-main.mdc'], agent:'hermes', to_agent:''},
   {id:6, project:'health-ops', origin:'ai', title:'Data shape',
    body:'metrics.json: array of {date, weight_kg, resting_hr, sleep_h}. Missing days are simply absent — do not interpolate.',
-   confidence:0.9, stale:false, verified_at:NOW-86400*3, ts:NOW-86400*3, sources:['scripts/ingest.py']},
+   confidence:0.9, stale:false, verified_at:NOW-86400*3, ts:NOW-86400*3,
+   sources:['scripts/ingest.py'], agent:'hermes', to_agent:''},
   {id:7, project:'health-ops', origin:'human', title:'Sleep tracker changed',
    body:'Switched the ring to the new app — sleep_h is now a decimal, not minutes.',
-   confidence:null, stale:false, verified_at:NOW-3600*8, ts:NOW-3600*8, sources:[]},
+   confidence:null, stale:false, verified_at:NOW-3600*8, ts:NOW-3600*8,
+   sources:[], agent:'you', to_agent:''},
   // ---- voice-lab ----
   {id:8, project:'voice-lab', origin:'ai', title:'GB10 pause rules',
    body:'Default: image jobs pause qwen-tts only; video pauses qwen-tts + qwen-image. The GLM brain (:8888) is never in the pause set.',
    confidence:0.95, stale:false, verified_at:NOW-3600*30, ts:NOW-3600*30,
-   sources:['.cursor/rules/gb10-exclusive-gpu.mdc']},
+   sources:['.cursor/rules/gb10-exclusive-gpu.mdc'], agent:'hermes', to_agent:''},
   {id:9, project:'voice-lab', origin:'ai', title:'TTS queue',
    body:'Fish runs append a dated row to projects/kids-story/README.md plus a JSON file under benchmarks/. Do not pile old scripts under runs/.',
    confidence:0.85, stale:false, verified_at:NOW-86400*6, ts:NOW-86400*6,
-   sources:['.cursor/rules/keep-root-clean-and-readmes.mdc']},
+   sources:['.cursor/rules/keep-root-clean-and-readmes.mdc'], agent:'hermes', to_agent:''},
   {id:10, project:'voice-lab', origin:'ai', title:'Minimax backend flag',
    body:'MINIMAX_H3_BACKEND stays "off" unless explicitly armed; never run a real generate while a book/TTS job is in flight.',
    confidence:0.8, stale:true, verified_at:NOW-86400*30, ts:NOW-86400*30,
-   sources:['.cursor/rules/gb10-exclusive-gpu.mdc']},
+   sources:['.cursor/rules/gb10-exclusive-gpu.mdc'], agent:'hermes', to_agent:''},
 ];
 
 /* =============== helpers =============== */
@@ -231,9 +258,16 @@ function dayOf(ts){
   if(days === 1) return 'Yesterday';
   return d.toLocaleDateString(undefined, {month:'short', day:'numeric'});
 }
+function orbColor(name){
+  const palette = ['#f85149','#3fb950','#58a6ff','#d2a8ff','#f0883e','#39d0d6','#ff7b72','#a5d6ff'];
+  let h = 0;
+  for(const c of (name||'')) h = (h*31 + c.charCodeAt(0)) >>> 0;
+  return palette[h % palette.length];
+}
+function prettyAgent(slug){ return (slug||'').replace(/-/g,' '); }
 function badges(n){
   const o = n.origin === 'human' ? '<span class="badge b-human">Human</span>'
-                                 : '<span class="badge b-ai">AI</span>';
+                                 : '<span class="badge b-ai">'+(n.agent ? esc(prettyAgent(n.agent)) : 'AI')+'</span>';
   const c = n.confidence != null ? '<span class="badge b-conf">conf '+Math.round(n.confidence*100)+'%</span>' : '';
   const s = n.stale ? '<span class="badge b-stale">STALE</span>'
                     : '<span class="badge b-ok">✓ ' + ago(n.verified_at) + '</span>';
@@ -273,9 +307,14 @@ function renderChat(){
   ns.forEach(n => {
     const d = dayOf(n.ts);
     if(d !== lastDay){ html += '<div class="day"><span>' + d + '</span></div>'; lastDay = d; }
+    if(n.to_agent){
+      const col = orbColor(n.to_agent);
+      html += '<div class="ping" style="--orb:'+col+'"><span class="orb" style="background:'+col+'"></span>Messaged <b>'+esc(prettyAgent(n.to_agent))+'</b></div>';
+    }
+    const who = n.origin==='human' ? 'You' : (n.agent ? prettyAgent(n.agent) : 'Brain');
     html +=
       '<div class="msg ' + n.origin + '">' +
-        '<div class="who">' + (n.origin==='human' ? 'You' : 'Brain') + '</div>' +
+        '<div class="who">' + esc(who) + '</div>' +
         '<div class="bubble"><span class="b-title">' + esc(n.title) + '</span>' +
         (n.body ? '\n' + esc(n.body) : '') + '</div>' +
         '<div class="meta">' + badges(n) + '</div>' +
@@ -322,9 +361,9 @@ $('composer-input').addEventListener('input', e => {
   e.target.style.height = Math.min(120, e.target.scrollHeight) + 'px';
 });
 
-/* =============== boot: open the busiest project =============== */
+/* =============== boot: open the Grok-spec orbit thread =============== */
 renderList();
-openChat('voice-lab');
+openChat('orbit');
 if(window.innerWidth < 880) closeChat();
 </script>
 </body>

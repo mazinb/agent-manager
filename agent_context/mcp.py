@@ -189,14 +189,21 @@ TOOLS = [
     {"name": "note", "description": "Share context: write a note into the brain under a "
      "project (space). Upserted by title within the project. Optionally give a "
      "confidence (0-1) and the source paths the note is based on — when those "
-     "sources change later, the note is flagged stale until re-saved.",
+     "sources change later, the note is flagged stale until re-saved. "
+     "Pass agent / to_agent for Grok-style Messaged ● peer lines in the inbox.",
      "inputSchema": {"type": "object", "properties": {
          "project": {"type": "string"}, "title": {"type": "string"},
          "body": {"type": "string"},
          "confidence": {"type": "number", "minimum": 0, "maximum": 1,
                         "description": "How sure you are the note is still accurate (0-1)."},
          "sources": {"type": "array", "items": {"type": "string"},
-                     "description": "Repo paths the note is derived from, e.g. [\"README.md\"]."}},
+                     "description": "Repo paths the note is derived from, e.g. [\"README.md\"]."},
+         "origin": {"type": "string", "enum": ["ai", "human"],
+                    "description": "ai (default) or human."},
+         "agent": {"type": "string",
+                   "description": "Who wrote this (e.g. hermes, grok-bot)."},
+         "to_agent": {"type": "string",
+                     "description": "Peer messaged — renders a Messaged ● line."}},
          "required": ["project", "body"]}},
     {"name": "add_note", "description": "Write a quick note into a project's "
      "thread (title is taken from the first line of text). Same as note() "
@@ -204,7 +211,9 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {
          "project": {"type": "string"}, "text": {"type": "string"},
          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-         "sources": {"type": "array", "items": {"type": "string"}}},
+         "sources": {"type": "array", "items": {"type": "string"}},
+         "origin": {"type": "string", "enum": ["ai", "human"]},
+         "agent": {"type": "string"}, "to_agent": {"type": "string"}},
          "required": ["project", "text"]}},
     {"name": "list_projects", "description": "Inbox-style rows: one per "
      "project with its latest activity, a one-line preview and note count.",

@@ -364,9 +364,6 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "project required"})
             return self._json(200, autonote.resolve_config(
                 BRAIN.con, project))
-        if path == "/api/inbox/projects":
-            return self._json(200,
-                              {"projects": store.list_projects(BRAIN.con)})
         if path == "/api/inbox/agents":
             return self._json(200,
                               {"agents": store.list_agents(BRAIN.con)})

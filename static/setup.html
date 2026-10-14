@@ -2,23 +2,174 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Setup — Agent Manager</title>
-<link rel="stylesheet" href="/static/app.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Inbox — Agent Manager</title>
 <style>
-.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;margin-right:6px;vertical-align:middle}
-.b-ai{background:#243044;color:#9fb4d4}.b-human{background:#1d3a2a;color:#7fd6a4}
-.b-conf{background:#2b2436;color:#c9a7f5}.b-ok{background:#1d3a2a;color:#7fd6a4}
-.b-stale{background:#3a1d1d;color:#f58f7f}.b-proj{background:#243044;color:#9fb4d4}
-.note{border:1px solid #243044;border-radius:10px;padding:10px 12px;margin-bottom:10px}
-.note h3{margin:0 0 6px;font-size:14px;font-weight:600;cursor:pointer;word-break:break-word}
-.note .body{display:none;margin-top:8px}
-.note.open .body{display:block}
-.note textarea{width:100%;min-height:120px;margin-top:6px}
-.meta{font-size:12px;color:#8b97ad}
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel-2:#1c2129; --border:#30363d;
+  --fg:#e6edf3; --dim:#8b949e; --faint:#6e7681;
+  --acc:#58a6ff; --acc-dim:#58a6ff33;
+  --ok:#3fb950; --warn:#d29922; --stale:#f58f7f;
+  --bubble-ai:#161b22; --bubble-human:#12261b;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.45 ui-sans-serif,system-ui,sans-serif}
+a{color:var(--acc);text-decoration:none}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+code{font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+
+/* ---- setup (pre-token) shell ---- */
+.top{display:flex;align-items:center;gap:10px;padding:12px 16px;
+  border-bottom:1px solid var(--border);background:#0d1117f5}
+.brand{font-size:15px;font-weight:650;color:var(--fg)}
+.top nav{margin-left:auto;display:flex;gap:2px}
+.top nav a{color:var(--dim);font-size:13px;padding:6px 10px;border-radius:8px}
+.top nav a:hover{color:var(--fg);background:#21262d}
+.top nav a.on{color:var(--acc);background:var(--acc-dim)}
+.wrap{max-width:560px;margin:0 auto;padding:20px 16px 72px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;margin:0 0 12px}
+.card h2{margin:0 0 8px;font-size:16px}
+.sub{color:var(--dim);margin:0 0 12px}
+label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
+input,textarea{width:100%;background:#0d1117;border:1px solid var(--border);
+  color:var(--fg);border-radius:8px;padding:10px 12px;font:inherit}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;
+  border-radius:10px;font-weight:600;font-size:14px;border:1px solid transparent}
+.btn.primary{background:var(--acc);color:#04121f}
+.btn.ghost{background:var(--panel);color:var(--fg);border-color:var(--border)}
+.hint{font-size:12px;color:var(--dim)}.warn{color:var(--warn)}.okmsg{color:var(--ok)}
+.hidden{display:none!important}
+.token{font:13px/1.4 ui-monospace,Menlo,monospace;background:#0d1117;border:1px solid var(--ok);
+  border-radius:10px;padding:12px;word-break:break-all}
+
+/* ---- inbox app (post-token) ---- */
+#inbox-app{display:none;height:100dvh}
+body.inbox #setup-shell{display:none}
+body.inbox #inbox-app{display:flex}
+#list-view{display:flex;flex-direction:column;width:100%;min-width:0;
+  border-right:1px solid var(--border);background:var(--bg)}
+.side-head{display:flex;align-items:center;gap:10px;padding:12px 14px;
+  border-bottom:1px solid var(--border)}
+.side-head h1{margin:0;font-size:17px;letter-spacing:-.01em;flex:1}
+.icon-btn{width:36px;height:36px;border-radius:10px;color:var(--dim);
+  display:flex;align-items:center;justify-content:center}
+.icon-btn:hover{background:var(--panel);color:var(--fg)}
+#proj-list{flex:1;overflow-y:auto;padding:8px}
+.proj{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;
+  padding:11px 12px;border-radius:10px;border:1px solid transparent}
+.proj:hover{background:var(--panel)}
+.proj.on{background:var(--panel);border-color:var(--border)}
+.proj .p-row{display:flex;align-items:baseline;gap:8px}
+.proj .p-name{font-weight:600;font-size:15px;font-family:ui-monospace,Menlo,monospace}
+.proj .p-count{margin-left:auto;font-size:11px;color:var(--dim);
+  background:var(--panel-2);border:1px solid var(--border);border-radius:999px;padding:1px 8px}
+.proj .p-last{font-size:13px;color:var(--dim);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:100%}
+.proj .p-age{font-size:11px;color:var(--faint)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.dot.ai{background:var(--acc)}.dot.human{background:var(--ok)}.dot.stale{background:var(--stale)}
+.empty{color:var(--dim);font-size:13px;padding:24px 12px;text-align:center}
+
+#chat-view{display:none;flex:1;min-width:0;flex-direction:column;background:var(--bg)}
+#inbox-app.in-chat #chat-view{display:flex}
+#inbox-app.in-chat #list-view{display:none}
+.chat-head{display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border-bottom:1px solid var(--border);background:#0d1117f2;backdrop-filter:blur(8px);
+  position:sticky;top:0;z-index:10}
+#btn-back{display:flex;align-items:center;gap:4px;color:var(--acc);font-size:14px;
+  padding:6px 8px;border-radius:8px}
+#btn-back:hover{background:var(--acc-dim)}
+.avatar{width:28px;height:28px;border-radius:50%;background:#21262d;border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--acc);
+  font-weight:700;flex-shrink:0}
+.c-title{font-weight:650;font-size:15px;font-family:ui-monospace,Menlo,monospace}
+.c-sub{font-size:11px;color:var(--dim);margin-top:1px}
+.spacer{margin-left:auto}
+
+#stream{flex:1;overflow-y:auto;padding:16px 12px 8px;display:flex;flex-direction:column}
+.day{text-align:center;font-size:11px;color:var(--faint);margin:14px 0 10px}
+.day span{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:3px 10px}
+
+/* Grok-style inter-agent status line — "Messaged ● peer" */
+.ping{align-self:center;font-size:12.5px;color:var(--faint);margin:10px 0 6px;
+  display:flex;align-items:center;gap:7px;letter-spacing:.01em}
+.ping .orb{width:9px;height:9px;border-radius:50%;flex-shrink:0;
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--orb,#f85149) 30%, transparent)}
+.ping b{color:var(--dim);font-weight:600}
+
+.msg{display:flex;flex-direction:column;margin:4px 0;max-width:78%}
+.msg.ai{align-self:flex-start}
+.msg.human{align-self:flex-end;align-items:flex-end}
+.msg .who{font-size:10.5px;color:var(--faint);margin:0 0 2px 4px;letter-spacing:.04em}
+.msg.human .who{margin-right:4px}
+.bubble{padding:9px 12px;border-radius:14px;font-size:14.5px;line-height:1.5;
+  word-break:break-word;white-space:pre-wrap}
+.msg.ai .bubble{background:var(--bubble-ai);border:1px solid var(--border);
+  border-left:2px solid var(--acc);border-top-left-radius:4px}
+.msg.human .bubble{background:var(--bubble-human);border:1px solid #2ea04344;
+  border-top-right-radius:4px}
+.bubble .b-title{font-weight:600;margin-bottom:2px}
+.meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;
+  font-size:10.5px;color:var(--faint);margin:3px 4px 8px}
+.badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:999px}
+.b-ai{background:#243044;color:#9fb4d4}
+.b-human{background:#1d3a2a;color:#7fd6a4}
+.b-conf{background:#2b2436;color:#c9a7f5}
+.b-ok{background:#1d3a2a;color:#7fd6a4}
+.b-stale{background:#3a1d1d;color:var(--stale)}
+.meta .from{color:var(--faint);font-family:ui-monospace,Menlo,monospace;font-size:10px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+
+.composer{border-top:1px solid var(--border);background:var(--panel);
+  padding:10px 10px calc(10px + env(safe-area-inset-bottom))}
+.composer .c-row{display:flex;gap:8px;align-items:flex-end}
+#composer-input{flex:1;resize:none;background:var(--bg);border:1px solid var(--border);
+  color:var(--fg);border-radius:12px;padding:10px 12px;font:inherit;line-height:1.45;
+  max-height:120px;min-height:42px}
+#composer-input:focus{outline:none;border-color:var(--acc)}
+#btn-send{flex-shrink:0;width:42px;height:42px;border-radius:12px;background:var(--acc);
+  color:#04121f;display:flex;align-items:center;justify-content:center;font-size:16px}
+#composer-title{width:100%;margin-bottom:6px;background:var(--bg);border:1px solid var(--border);
+  color:var(--dim);border-radius:8px;padding:6px 10px;font-size:12px}
+#composer-title:focus{outline:none;border-color:var(--acc);color:var(--fg)}
+.composer .hint{font-size:10.5px;color:var(--faint);margin:6px 4px 0}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);
+  background:var(--panel);border:1px solid var(--ok);color:var(--ok);
+  border-radius:10px;padding:8px 14px;font-size:13px;opacity:0;pointer-events:none;
+  transition:opacity .25s;z-index:50}
+.toast.on{opacity:1}
+
+/* Agents menu — Grok-style centered overlay (clean name list) */
+#agents-sheet{display:none;position:fixed;inset:0;z-index:40;
+  background:#00000099;align-items:center;justify-content:center;padding:24px}
+#agents-sheet.on{display:flex}
+#agents-panel{width:min(300px,100%);max-height:70dvh;background:#1c2128ee;
+  border:1px solid var(--border);border-radius:16px;padding:10px 0 12px;
+  overflow-y:auto;backdrop-filter:blur(12px)}
+#agents-panel h3{margin:6px 18px 8px;font-size:12px;color:var(--dim);font-weight:600;
+  letter-spacing:.03em}
+.agent-row{display:block;width:100%;text-align:left;padding:12px 18px;
+  color:var(--fg);font-size:15.5px;font-weight:500}
+.agent-row:hover{background:#21262d}
+
+@media (min-width:880px){
+  #list-view{width:300px;flex-shrink:0}
+  #chat-view{display:flex}
+  #btn-back{display:none}
+  #inbox-app.in-chat #list-view{display:flex}
+  .chat-head{padding:12px 16px}
+  #stream{padding:20px 24px 8px}
+  .msg{max-width:66%}
+  .composer{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+}
 </style>
 </head>
 <body>
+<div id="setup-shell">
 <header class="top">
   <a class="brand" href="/">Agent Manager</a>
   <nav>
@@ -30,36 +181,12 @@
 <main class="wrap">
   <div class="card" id="loading"><p class="sub" style="margin:0">Checking…</p></div>
 
-  <div class="card hidden" id="panel-inbox">
-    <h2>Inbox</h2>
-    <p class="sub">Your notes. Tap one to read or edit; edits are marked human.</p>
-    <div class="actions" style="margin-top:8px">
-      <button class="btn primary" type="button" onclick="toggleNew()">New note</button>
-      <a class="btn ghost" href="/brain/">Brain</a>
-      <a class="btn ghost" href="#" onclick="signOut();return false;">Sign out</a>
-    </div>
-    <div id="new-note" class="hidden" style="margin-top:12px">
-      <label for="nn-project">Project</label>
-      <input id="nn-project" placeholder="project name">
-      <label for="nn-title" style="margin-top:8px">Title</label>
-      <input id="nn-title" placeholder="title">
-      <label for="nn-body" style="margin-top:8px">Body</label>
-      <textarea id="nn-body" style="width:100%;min-height:100px" placeholder="what should the brain remember?"></textarea>
-      <div class="actions" style="margin-top:10px">
-        <button class="btn primary" type="button" onclick="saveNote(null)">Save note</button>
-        <button class="btn ghost" type="button" onclick="toggleNew()">Cancel</button>
-      </div>
-    </div>
-    <div id="notes" style="margin-top:14px"></div>
-    <p class="hint" id="inbox-status"></p>
-  </div>
-
   <div class="card hidden" id="panel-bootstrap">
     <h2>Create token</h2>
     <p class="sub">Shown once. Save it — UI + MCP use the same value.</p>
     <label for="label">Label</label>
     <input id="label" placeholder="optional">
-    <div class="actions" style="margin-top:12px">
+    <div class="actions">
       <button class="btn primary" type="button" id="btn-bootstrap" onclick="bootstrap()">Create</button>
     </div>
   </div>
@@ -73,7 +200,7 @@
       <label for="invite" style="margin-top:10px">Invite</label>
       <input id="invite" placeholder="invite code">
     </div>
-    <div class="actions" style="margin-top:12px">
+    <div class="actions">
       <button class="btn primary" type="button" onclick="signup()">Create</button>
       <a class="btn ghost hidden" id="btn-github" href="/api/auth/github/start">Sign in with GitHub</a>
     </div>
@@ -85,7 +212,7 @@
     <p class="sub">Or self-host: <code>npx agent-manager-brain init && npx agent-manager-brain serve</code></p>
     <label for="existing">Token</label>
     <input id="existing" type="password" placeholder="Paste token" autocomplete="current-password">
-    <div class="actions" style="margin-top:12px">
+    <div class="actions">
       <button class="btn primary" type="button" onclick="saveExisting()">Continue</button>
       <a class="btn ghost" href="/connect/">Connect</a>
       <a class="btn ghost hidden" id="btn-github2" href="/api/auth/github/start">Sign in with GitHub</a>
@@ -96,25 +223,100 @@
     <h2>Save this token</h2>
     <p class="hint warn">Won’t be shown again.</p>
     <div class="token" id="token-value"></div>
-    <div class="actions" style="margin-top:12px">
+    <div class="actions">
       <button class="btn primary" type="button" onclick="copyToken()">Copy</button>
       <a class="btn ghost" href="/connect/">Connect</a>
-      <a class="btn ghost" href="/brain/">Brain</a>
+      <button class="btn ghost" type="button" onclick="enterInbox()">Open Inbox</button>
     </div>
     <p class="hint okmsg" id="copied"></p>
   </div>
 </main>
+</div>
+
+<div id="inbox-app">
+  <aside id="list-view">
+    <div class="side-head">
+      <h1>Inbox</h1>
+      <button class="icon-btn" type="button" title="Agents" onclick="openAgents()" aria-label="Agents">☰</button>
+      <a class="icon-btn" href="/brain/" title="Brain">◎</a>
+      <button class="icon-btn" type="button" title="Sign out" onclick="signOut()" aria-label="Sign out">⎋</button>
+    </div>
+    <div id="proj-list"><div class="empty">Loading…</div></div>
+  </aside>
+
+  <main id="chat-view">
+    <div class="chat-head">
+      <button id="btn-back" type="button" onclick="closeChat()">←</button>
+      <div class="avatar" id="chat-av">·</div>
+      <div>
+        <div class="c-title" id="chat-title">—</div>
+        <div class="c-sub" id="chat-sub"></div>
+      </div>
+      <div class="spacer"></div>
+    </div>
+    <div id="stream"></div>
+    <div class="composer">
+      <input id="composer-title" placeholder="Title (optional)">
+      <div class="c-row">
+        <textarea id="composer-input" rows="1" placeholder="Ask this thread…"></textarea>
+        <button id="btn-send" type="button" onclick="send()" aria-label="Save note">➤</button>
+      </div>
+      <div class="hint">Saved as a <b>Human</b> note in <span id="hint-proj">—</span>. Agents use <code>note</code> with <code>agent</code>/<code>to_agent</code> for Messaged lines. Enter to send.</div>
+    </div>
+  </main>
+</div>
+
+<div id="agents-sheet" onclick="if(event.target===this)closeAgents()">
+  <div id="agents-panel">
+    <h3>Agents</h3>
+    <div id="agents-list"><div class="empty">No agent traffic yet.</div></div>
+  </div>
+</div>
+<div class="toast" id="toast">Saved.</div>
+
 <script>
 const $ = id => document.getElementById(id);
-let CREATED = '';
 const esc = s => (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const TOKEN = () => localStorage.getItem('am_token') || '';
+let CREATED = '', OPEN = null, NOTES = [], PROJECTS = [], AGENTS = [];
+
 function ago(ts){
   if(!ts) return '';
   const s = Math.max(1, Math.floor(Date.now()/1000 - ts));
   const u = [[86400,'d'],[3600,'h'],[60,'m'],[1,'s']].find(([n]) => s>=n);
   return Math.floor(s/u[0]) + u[1] + ' ago';
 }
-const TOKEN = () => localStorage.getItem('am_token') || '';
+function dayOf(ts){
+  const d = new Date(ts*1000), t = new Date();
+  const days = Math.floor((t.setHours(0,0,0,0) - new Date(d).setHours(0,0,0,0)) / 86400000);
+  if(days === 0) return 'Today';
+  if(days === 1) return 'Yesterday';
+  return d.toLocaleDateString(undefined, {month:'short', day:'numeric'});
+}
+function initials(name){
+  const s = (name||'?').replace(/[^a-z0-9]/gi,'').slice(0,2).toUpperCase();
+  return s || '·';
+}
+function orbColor(name){
+  // Stable pastel for Messaged ● peer (Grok uses distinct agent orbs)
+  const palette = ['#f85149','#3fb950','#58a6ff','#d2a8ff','#f0883e','#39d0d6','#ff7b72','#a5d6ff'];
+  let h = 0;
+  for(const c of (name||'')) h = (h*31 + c.charCodeAt(0)) >>> 0;
+  return palette[h % palette.length];
+}
+function prettyAgent(slug){
+  return (slug||'').replace(/-/g,' ');
+}
+
+async function api(path, opts={}){
+  const r = await fetch(path, {
+    ...opts,
+    headers: {'X-Token': TOKEN(), 'Content-Type':'application/json', ...(opts.headers||{})},
+  });
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error || ('HTTP '+r.status));
+  return d;
+}
 
 async function boot(){
   const s = await fetch('/api/setup/status').then(r=>r.json());
@@ -124,16 +326,11 @@ async function boot(){
     $('github-hint').classList.remove('hidden');
     $('btn-github2').classList.remove('hidden');
   }
-  // Setup done (token saved)? Then this tab is the inbox.
   if(TOKEN()){
-    const r = await fetch('/api/inbox', {headers:{'X-Token': TOKEN()}});
-    if(r.ok){
-      const d = await r.json();
-      renderInbox(d.notes || []);
-      $('panel-inbox').classList.remove('hidden');
+    try {
+      await enterInbox();
       return;
-    }
-    // token invalid for this brain — fall through to setup
+    } catch (_) { /* fall through to setup */ }
   }
   if(s.bootstrap) $('panel-bootstrap').classList.remove('hidden');
   else if(s.signup_open) {
@@ -144,55 +341,165 @@ async function boot(){
   if(t) $('existing').value = t;
 }
 
-function badge(cls, text){ return '<span class="badge '+cls+'">'+esc(text)+'</span>'; }
+async function enterInbox(){
+  document.body.classList.add('inbox');
+  const [proj, agents] = await Promise.all([
+    api('/api/inbox/projects'),
+    api('/api/inbox/agents'),
+  ]);
+  PROJECTS = proj.projects || [];
+  AGENTS = agents.agents || [];
+  renderList();
+  renderAgents();
+  if(PROJECTS.length && window.innerWidth >= 880){
+    openChat(PROJECTS[0].project);
+  }
+}
 
-function renderInbox(notes){
-  const el = $('notes');
-  if(!notes.length){
-    $('inbox-status').textContent = 'No notes yet. Anything saved with the note tool lands here.';
+function renderList(){
+  const el = $('proj-list');
+  if(!PROJECTS.length){
+    el.innerHTML = '<div class="empty">No project threads yet.<br>Agents save notes with the <code>note</code> tool — one thread per repo.</div>';
     return;
   }
-  el.innerHTML = notes.map((n,i) => {
-    const badges =
-      badge('b-proj', n.project) +
-      badge(n.origin === 'human' ? 'b-human' : 'b-ai', n.origin === 'human' ? 'Human' : 'AI') +
-      (n.confidence != null ? badge('b-conf', 'conf ' + Math.round(n.confidence*100) + '%') : '') +
-      (n.stale ? badge('b-stale', 'STALE') : badge('b-ok', '✓ ' + ago(n.verified_at)));
-    return '<div class="note" id="note-'+i+'">' +
-      '<h3 onclick="this.parentNode.classList.toggle(\'open\')">' + esc(n.title) + '</h3>' +
-      '<div class="meta">' + badges +
-      (n.based_on && n.based_on.length ? ' · from ' + esc(n.based_on.join(', ')) : '') + '</div>' +
-      '<div class="body">' +
-        '<textarea id="body-'+i+'">' + esc(n.body) + '</textarea>' +
-        '<div class="actions" style="margin-top:8px">' +
-          '<button class="btn primary" type="button" onclick="saveNote('+i+')">Save edit</button>' +
-        '</div>' +
-      '</div></div>';
+  el.innerHTML = PROJECTS.map(p => {
+    const stale = false; // preview API doesn't expose; dots by last_origin
+    const dot = p.last_origin || 'ai';
+    return '<button type="button" class="proj'+(OPEN===p.project?' on':'')+'" data-p="'+esc(p.project)+'">' +
+      '<span class="p-row"><span class="p-name"><span class="dot '+dot+'"></span>'+esc(p.project)+'</span>' +
+      '<span class="p-count">'+p.note_count+'</span></span>' +
+      '<span class="p-last">'+(p.preview ? esc(p.preview) : 'No notes yet')+'</span>' +
+      '<span class="p-age">'+(p.last_ts ? ago(p.last_ts) : '')+'</span></button>';
   }).join('');
-  window.NOTES = notes;
+  el.querySelectorAll('.proj').forEach(b => b.onclick = () => openChat(b.dataset.p));
 }
 
-function toggleNew(){ $('new-note').classList.toggle('hidden'); }
-
-async function saveNote(i){
-  let payload;
-  if(i === null){
-    const project = $('nn-project').value.trim(), title = $('nn-title').value.trim(), body = $('nn-body').value;
-    if(!project || !title || !body.trim()){ alert('project, title and body are all needed'); return; }
-    payload = {project, title, body};
-  } else {
-    const n = window.NOTES[i];
-    payload = {project: n.project, title: n.title, body: $('body-'+i).value};
+function renderAgents(){
+  const el = $('agents-list');
+  if(!AGENTS.length){
+    el.innerHTML = '<div class="empty">No agent traffic yet.<br>Pass <code>agent</code> / <code>to_agent</code> on <code>note</code>.</div>';
+    return;
   }
-  payload.origin = 'human'; // human edits are badged as human
-  const r = await fetch('/api/note', {
-    method:'POST', headers:{'Content-Type':'application/json','X-Token': TOKEN()},
-    body: JSON.stringify(payload),
+  // Grok overlay: clean name list (no counts/avatars)
+  el.innerHTML = AGENTS.map(a =>
+    '<button type="button" class="agent-row" data-a="'+esc(a.agent)+'">' +
+      esc(prettyAgent(a.agent)) + '</button>'
+  ).join('');
+  el.querySelectorAll('.agent-row').forEach(b => b.onclick = () => {
+    closeAgents();
+    filterAgent(b.dataset.a);
   });
-  const d = await r.json();
-  if(!r.ok){ alert(d.error || 'save failed'); return; }
-  boot(); // re-render with fresh badges/timestamps
 }
+
+async function filterAgent(name){
+  // Find a project with notes from/to this agent and open it
+  for(const p of PROJECTS){
+    const d = await api('/api/inbox?project='+encodeURIComponent(p.project));
+    const hit = (d.notes||[]).some(n => n.agent===name || n.to_agent===name);
+    if(hit){ openChat(p.project); return; }
+  }
+}
+
+function openAgents(){ $('agents-sheet').classList.add('on'); }
+function closeAgents(){ $('agents-sheet').classList.remove('on'); }
+
+async function openChat(project){
+  OPEN = project;
+  $('inbox-app').classList.add('in-chat');
+  $('chat-title').textContent = project;
+  $('hint-proj').textContent = project;
+  $('chat-av').textContent = initials(project);
+  renderList();
+  $('stream').innerHTML = '<div class="empty">Loading…</div>';
+  const d = await api('/api/inbox?project='+encodeURIComponent(project));
+  NOTES = (d.notes || []).slice().sort((a,b) => (a.verified_at||0) - (b.verified_at||0));
+  renderChat();
+  $('composer-input').focus();
+}
+
+function closeChat(){
+  OPEN = null;
+  $('inbox-app').classList.remove('in-chat');
+  renderList();
+}
+
+function badges(n){
+  const o = n.origin === 'human'
+    ? '<span class="badge b-human">Human</span>'
+    : '<span class="badge b-ai">'+(n.agent ? esc(n.agent) : 'AI')+'</span>';
+  const c = n.confidence != null ? '<span class="badge b-conf">conf '+Math.round(n.confidence*100)+'%</span>' : '';
+  const s = n.stale ? '<span class="badge b-stale">STALE</span>'
+                    : (n.verified_at ? '<span class="badge b-ok">✓ '+ago(n.verified_at)+'</span>' : '');
+  const src = (n.sources && n.sources.length) ? n.sources : (n.based_on||[]);
+  const f = src.length ? '<span class="from">from '+esc(src.join(', '))+'</span>' : '';
+  return o+c+s+f;
+}
+
+function renderChat(){
+  const st = $('stream');
+  $('chat-sub').textContent = NOTES.length + ' notes · newest at the bottom';
+  if(!NOTES.length){
+    st.innerHTML = '<div class="empty">No notes in this project yet.<br>Agents across repos write here with the <code>note</code> tool.</div>';
+    return;
+  }
+  let html = '', lastDay = '';
+  NOTES.forEach(n => {
+    const d = dayOf(n.verified_at || 0);
+    if(d !== lastDay){ html += '<div class="day"><span>'+d+'</span></div>'; lastDay = d; }
+    // Grok-style "Messaged ● peer" line when an agent messages another
+    if(n.to_agent){
+      const col = orbColor(n.to_agent);
+      html += '<div class="ping" style="--orb:'+col+'"><span class="orb" style="background:'+col+'"></span>Messaged <b>'+esc(prettyAgent(n.to_agent))+'</b></div>';
+    }
+    const who = n.origin === 'human' ? 'You'
+              : (n.agent ? prettyAgent(n.agent) : 'Brain');
+    html +=
+      '<div class="msg '+esc(n.origin||'ai')+'">' +
+        '<div class="who">'+esc(who)+'</div>' +
+        '<div class="bubble">' +
+          (n.title ? '<div class="b-title">'+esc(n.title)+'</div>' : '') +
+          esc(n.body||'') +
+        '</div>' +
+        '<div class="meta">'+badges(n)+'</div>' +
+      '</div>';
+  });
+  st.innerHTML = html;
+  st.scrollTop = st.scrollHeight;
+}
+
+async function send(){
+  const body = $('composer-input').value.trim();
+  if(!body || !OPEN) return;
+  const title = $('composer-title').value.trim() || body.split('\n')[0].slice(0, 60);
+  $('btn-send').disabled = true;
+  try {
+    await api('/api/note', {
+      method:'POST',
+      body: JSON.stringify({project: OPEN, title, body, origin:'human', agent:'you'}),
+    });
+    $('composer-input').value = '';
+    $('composer-title').value = '';
+    $('composer-input').style.height = 'auto';
+    await openChat(OPEN);
+    const p = await api('/api/inbox/projects');
+    PROJECTS = p.projects || [];
+    renderList();
+    $('toast').classList.add('on');
+    setTimeout(() => $('toast').classList.remove('on'), 1400);
+  } catch (e) {
+    alert(e.message || 'save failed');
+  } finally {
+    $('btn-send').disabled = false;
+  }
+}
+
+$('composer-input').addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+});
+$('composer-input').addEventListener('input', e => {
+  e.target.style.height = 'auto';
+  e.target.style.height = Math.min(120, e.target.scrollHeight) + 'px';
+});
 
 function signOut(){ localStorage.removeItem('am_token'); location.reload(); }
 
@@ -229,7 +536,7 @@ function saveExisting(){
   const t = $('existing').value.trim();
   if(!t) return;
   localStorage.setItem('am_token', t);
-  location.href = '/brain/';
+  enterInbox().catch(() => { alert('Token rejected'); signOut(); });
 }
 async function copyToken(){
   await navigator.clipboard.writeText(CREATED);

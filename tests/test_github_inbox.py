@@ -112,6 +112,64 @@ class InboxListing(unittest.TestCase):
         self.assertEqual(row["origin"], "human")
         self.assertEqual(store.list_notes(con)[0]["body"], "v2")
 
+    def test_list_notes_exposes_id_and_sources_alias(self):
+        con = fresh_con()
+        mcp._note(_Brain(con), {"project": "demo", "title": "t", "body": "b",
+                                "sources": ["a.md"]})
+        n = store.list_notes(con)[0]
+        self.assertIsInstance(n["id"], int)
+        self.assertEqual(n["sources"], ["a.md"])
+        self.assertEqual(n["based_on"], n["sources"])
+
+
+class GrokAgentPeers(unittest.TestCase):
+    """Grok-spec: agent → to_agent powers Messaged ● peer lines + agents menu."""
+
+    def test_note_stores_agent_and_to_agent(self):
+        con = fresh_con()
+        out = mcp._note(_Brain(con), {
+            "project": "orbit", "title": "ask-dr-eggbot",
+            "body": "Please set up Orbit Mentees.",
+            "agent": "Grok Bot", "to_agent": "dr eggbot",
+        })
+        self.assertEqual(out["agent"], "grok-bot")
+        self.assertEqual(out["to_agent"], "dr-eggbot")
+        n = store.list_notes(con, "orbit")[0]
+        self.assertEqual(n["agent"], "grok-bot")
+        self.assertEqual(n["to_agent"], "dr-eggbot")
+
+    def test_list_agents_aggregates_writers_and_peers(self):
+        con = fresh_con()
+        mcp._note(_Brain(con), {
+            "project": "orbit", "title": "a", "body": "hi",
+            "agent": "grok-bot", "to_agent": "dr-eggbot"})
+        mcp._note(_Brain(con), {
+            "project": "orbit", "title": "b", "body": "reply",
+            "agent": "dr-eggbot", "to_agent": "grok-bot"})
+        mcp._note(_Brain(con), {
+            "project": "travel", "title": "c", "body": "audit",
+            "agent": "grok-bot", "to_agent": "travel-helper"})
+        agents = store.list_agents(con)
+        by = {a["agent"]: a["notes"] for a in agents}
+        self.assertEqual(by["grok-bot"], 3)  # 2 as agent + 1 as to_agent
+        self.assertEqual(by["dr-eggbot"], 2)
+        self.assertEqual(by["travel-helper"], 1)
+        # Sorted by note count desc
+        self.assertEqual(agents[0]["agent"], "grok-bot")
+
+    def test_list_projects_preview_and_ordering(self):
+        con = fresh_con()
+        mcp._note(_Brain(con), {"project": "older", "title": "t",
+                                "body": "first line\nmore"})
+        time.sleep(0.01)
+        mcp._note(_Brain(con), {"project": "newer", "title": "t",
+                                "body": "# ignore\npreview here"})
+        rows = store.list_projects(con)
+        self.assertEqual([r["project"] for r in rows], ["newer", "older"])
+        self.assertEqual(rows[0]["preview"], "preview here")
+        self.assertEqual(rows[0]["note_count"], 1)
+        self.assertEqual(rows[1]["preview"], "first line")
+
 
 class GithubSignIn(unittest.TestCase):
     def test_scope_is_read_only_minimal(self):
