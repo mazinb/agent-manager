@@ -202,5 +202,47 @@ class Chunk3PerProjectScoping(unittest.TestCase):
         self.assertEqual({r["project"] for r in payload["results"]}, {"beta"})
 
 
+class Chunk4ProvenanceInResults(unittest.TestCase):
+    def test_search_results_carry_trust_fields(self):
+        from agent_context import query
+        con = fresh_con()
+        store.upsert_source(con, "docs/README.md", "project_readme", "p",
+                            1, 10, [("README", "deploy with script A")])
+        sid = store.upsert_source(con, "note:p/deploy", "note", "p", 1, 20,
+                                  [("deploy", "NOTE-ONLY-MARKER alpha 7")])
+        store.set_note_meta(con, sid, confidence=0.9, based_on=["docs/README.md"])
+        con.commit()
+        hits = query.search(con, "deploy", include_stale=False)
+        note = [r for r in hits if r["path"] == "note:p/deploy"]
+        self.assertEqual(len(note), 1)
+        self.assertEqual(note[0]["confidence"], 0.9)
+        self.assertGreater(note[0]["verified_at"], 0)
+        self.assertEqual(note[0]["stale"], 0)
+        # source-doc hits ride the same shape with NULL trust fields
+        doc = [r for r in hits if r["path"] == "docs/README.md"]
+        self.assertEqual(len(doc), 1)
+        self.assertIsNone(doc[0]["confidence"])
+
+    def test_entity_card_chunks_show_provenance(self):
+        from agent_context import query
+        con = fresh_con()
+        store.upsert_source(con, "docs/README.md", "project_readme", "p",
+                            1, 10, [("README", "the deployd tool builds things")])
+        con.commit()
+        eid = store.upsert_entity(con, "deployd", "tool")
+        cid = con.execute("SELECT id FROM chunks LIMIT 1").fetchone()["id"]
+        con.execute("INSERT INTO mentions(chunk_id, entity_id) VALUES(?,?)",
+                    (cid, eid))
+        con.commit()
+        card = query.entity_card(con, "deployd")
+        self.assertIsNotNone(card)
+        self.assertEqual(len(card["chunks"]), 1)
+        c = card["chunks"][0]
+        self.assertEqual(c["kind"], "project_readme")
+        self.assertEqual(c["path"], "docs/README.md")
+        self.assertIn("stale", c)
+        self.assertIn("confidence", c)
+
+
 if __name__ == "__main__":
     unittest.main()

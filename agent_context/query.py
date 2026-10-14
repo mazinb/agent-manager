@@ -40,7 +40,8 @@ def search(con, q, limit=12, include_stale=False, project=None):
     results = {}
     if expr:
         rows = con.execute(
-            "SELECT c.id, c.heading, c.text, s.path, s.project, s.kind, s.stale "
+            "SELECT c.id, c.heading, c.text, s.path, s.project, s.kind, s.stale, "
+            "s.confidence, s.verified_at "
             "FROM chunks_fts f JOIN chunks c ON c.id=f.rowid "
             "JOIN sources s ON c.source_id=s.id "
             "WHERE chunks_fts MATCH ?" + project_guard + stale_guard +
@@ -54,7 +55,8 @@ def search(con, q, limit=12, include_stale=False, project=None):
                            (m,)).fetchone()
         if erow:
             rows = con.execute(
-                "SELECT c.id, c.heading, c.text, s.path, s.project, s.kind, s.stale "
+                "SELECT c.id, c.heading, c.text, s.path, s.project, s.kind, s.stale, "
+                "s.confidence, s.verified_at "
                 "FROM mentions mn JOIN chunks c ON c.id=mn.chunk_id "
                 "JOIN sources s ON c.source_id=s.id "
                 "WHERE mn.entity_id=?" + project_guard + stale_guard + " LIMIT ?",
@@ -74,7 +76,8 @@ def entity_card(con, name):
     if not erow:
         return None
     chunks = con.execute(
-        "SELECT c.heading, c.text, s.path, s.project FROM mentions mn "
+        "SELECT c.heading, c.text, s.path, s.project, s.kind, s.stale, "
+        "s.confidence, s.verified_at FROM mentions mn "
         "JOIN chunks c ON c.id=mn.chunk_id JOIN sources s ON c.source_id=s.id "
         "WHERE mn.entity_id=? ORDER BY s.kind LIMIT 20",
         (erow["id"],)).fetchall()

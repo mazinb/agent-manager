@@ -81,6 +81,9 @@ code{font-family:var(--mono);font-size:.92em;background:#21262d;border-radius:4p
 .result:first-child{border-top:0;padding-top:0}
 .result .meta{font-family:var(--mono)}
 .result .heading{font-weight:600;margin:0 0 4px}
+.badge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;vertical-align:1px}
+.badge.stale{background:#5c2b2b;color:#ffb4a9}
+.badge.conf{background:#2b3a4a;color:#9cc3e0}
 .md p{margin:0 0 8px}
 .md p:last-child{margin:0}
 .md ul,.md ol{margin:0 0 8px;padding-left:20px}
@@ -356,7 +359,13 @@ async function ask() {
         t = t.slice(m[0].length);
       }
     }
-    return `<div class="result"><div class="meta">${esc(r.project || '')} <span class="sep">·</span> ${esc(r.kind)} <span class="sep">·</span> ${esc(r.path)}</div>
+    const badges = [];
+    if (r.kind === 'note') {
+      if (r.stale) badges.push('<span class="badge stale" title="Based-on source changed or vanished — excluded from packs/answers unless include_stale">STALE</span>');
+      if (r.confidence != null) badges.push(`<span class="badge conf" title="Agent-stated confidence">conf ${Math.round(r.confidence * 100)}%</span>`);
+      if (r.verified_at) badges.push(`<span class="badge conf" title="Last agent re-verification (UTC)">✓ ${new Date(r.verified_at * 1000).toISOString().slice(0, 10)}</span>`);
+    }
+    return `<div class="result"><div class="meta">${esc(r.project || '')} <span class="sep">·</span> ${esc(r.kind)} <span class="sep">·</span> ${esc(r.path)} ${badges.join(' ')}</div>
      ${r.heading ? `<div class="heading">${esc(r.heading)}</div>` : ''}<div class="md">${renderMd(excerpt(t, 600))}</div></div>`;
   }).join('');
 }
