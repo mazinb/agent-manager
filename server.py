@@ -274,8 +274,11 @@ class Handler(BaseHTTPRequestHandler):
             card = query.entity_card(BRAIN.con, (q.get("name") or [""])[0])
             return self._json(200, card or {"error": "unknown"})
         if path == "/api/entities":
+            # mentions is an additive display count; existing fields unchanged
             rows = BRAIN.con.execute(
-                "SELECT name, type, blurb FROM entities ORDER BY type, name"
+                "SELECT e.name, e.type, e.blurb,"
+                " (SELECT COUNT(*) FROM mentions m WHERE m.entity_id = e.id) AS mentions"
+                " FROM entities e ORDER BY e.type, e.name"
             ).fetchall()
             return self._json(200, {"entities": [dict(r) for r in rows]})
         if path == "/api/projects":
