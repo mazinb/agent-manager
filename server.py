@@ -360,7 +360,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"ok": True})
             return self._json(401, {"ok": False, "error": "unauthorized"})
 
-        if path not in ("/api/ask", "/api/refresh", "/api/note", "/mcp"):
+        if path not in (
+            "/api/ask", "/api/refresh", "/api/note",
+            "/api/project/visibility", "/mcp",
+        ):
             return self._json(404, {"error": "not found"})
         if not self._authed():
             return self._json(401, {"error": "unauthorized"})

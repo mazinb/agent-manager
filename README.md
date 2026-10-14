@@ -90,6 +90,11 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-14** — Brain chrome snappy pass: sticky header+tabs+per-tab
+  controls (no layout hop on load), parallel boot, Packs auto-load on
+  select, plain private/public toggle (no emoji). **Bugfix:** POST
+  `/api/project/visibility` was unreachable (404) because the do_POST
+  allowlist omitted it — toggle is live again. 25 tests green.
 - **2026-10-14** — Reddit feedback wave 1 (r/mcp): trust metadata on notes
   (confidence, based_on, verified_at, content_hash), source-change
   invalidation (stale notes excluded from search/ask/packs, opt-in
