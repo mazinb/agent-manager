@@ -31,10 +31,13 @@
 
   <div class="card hidden" id="panel-signup">
     <h2>Get a free token</h2>
+    <p class="sub">Save it — same token for the UI and MCP.</p>
     <label for="label2">Label</label>
     <input id="label2" placeholder="optional">
-    <label for="invite" style="margin-top:10px">Invite</label>
-    <input id="invite" placeholder="if required">
+    <div id="invite-wrap" class="hidden">
+      <label for="invite" style="margin-top:10px">Invite</label>
+      <input id="invite" placeholder="invite code">
+    </div>
     <div class="actions" style="margin-top:12px">
       <button class="btn primary" type="button" onclick="signup()">Create</button>
     </div>
@@ -70,8 +73,10 @@ async function boot(){
   const s = await fetch('/api/setup/status').then(r=>r.json());
   $('loading').classList.add('hidden');
   if(s.bootstrap) $('panel-bootstrap').classList.remove('hidden');
-  else if(s.signup_open) $('panel-signup').classList.remove('hidden');
-  else $('panel-locked').classList.remove('hidden');
+  else if(s.signup_open) {
+    $('panel-signup').classList.remove('hidden');
+    if(s.invite_required) $('invite-wrap').classList.remove('hidden');
+  } else $('panel-locked').classList.remove('hidden');
   const t = localStorage.getItem('am_token');
   if(t) $('existing').value = t;
 }
