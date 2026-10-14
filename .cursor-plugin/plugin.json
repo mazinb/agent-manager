@@ -1,6 +1,6 @@
 {
   "name": "agent-manager",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Shared brain for coding agents — recall project context and save decisions over MCP.",
   "author": {
     "name": "mazinb",
