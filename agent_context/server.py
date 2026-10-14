@@ -105,8 +105,11 @@ def make_handler(brain, token, static_dir):
                 card = query.entity_card(brain.con, (q.get("name") or [""])[0])
                 return self._json(200, card or {"error": "unknown"})
             if u.path == "/api/entities":
+                # mentions is an additive display count; existing fields unchanged
                 rows = brain.con.execute(
-                    "SELECT name, type, blurb FROM entities ORDER BY type, name"
+                    "SELECT e.name, e.type, e.blurb,"
+                    " (SELECT COUNT(*) FROM mentions m WHERE m.entity_id = e.id) AS mentions"
+                    " FROM entities e ORDER BY e.type, e.name"
                 ).fetchall()
                 return self._json(200, {"entities": [dict(r) for r in rows]})
             if u.path == "/api/projects":
