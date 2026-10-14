@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>Inbox — Agent Manager</title>
+<title>Inbox — Zoro</title>
 <style>
 :root{
   --bg:#0d1117; --panel:#161b22; --panel-2:#1c2129; --border:#30363d;
@@ -12,6 +12,7 @@
   --acc:#58a6ff; --acc-dim:#58a6ff33;
   --ok:#3fb950; --warn:#d29922; --stale:#f58f7f;
   --bubble-ai:#161b22; --bubble-human:#12261b;
+  --chrome-h:48px;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);
@@ -20,10 +21,12 @@ a{color:var(--acc);text-decoration:none}
 button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 code{font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
 
-/* ---- setup (pre-token) shell ---- */
-.top{display:flex;align-items:center;gap:10px;padding:12px 16px;
-  border-bottom:1px solid var(--border);background:#0d1117f5}
-.brand{font-size:15px;font-weight:650;color:var(--fg)}
+/* shared Zoro chrome — same height/padding as every page */
+.top{display:flex;align-items:center;gap:10px;height:var(--chrome-h);
+  padding:0 14px;border-bottom:1px solid var(--border);position:sticky;top:0;
+  background:#0d1117f5;backdrop-filter:blur(10px);z-index:30}
+.top .brand{font-size:15px;font-weight:700;color:var(--fg);letter-spacing:-.02em}
+.top .brand:hover{color:var(--acc)}
 .top nav{margin-left:auto;display:flex;gap:2px}
 .top nav a{color:var(--dim);font-size:13px;padding:6px 10px;border-radius:8px}
 .top nav a:hover{color:var(--fg);background:#21262d}
@@ -31,8 +34,8 @@ code{font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
 .wrap{max-width:560px;margin:0 auto;padding:20px 16px 72px}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
   padding:14px 16px;margin:0 0 12px}
-.card h2{margin:0 0 8px;font-size:16px}
-.sub{color:var(--dim);margin:0 0 12px}
+.card h2{margin:0 0 8px;font-size:15px;font-weight:600}
+.sub{color:var(--dim);margin:0 0 12px;font-size:14px}
 label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 input,textarea{width:100%;background:#0d1117;border:1px solid var(--border);
   color:var(--fg);border-radius:8px;padding:10px 12px;font:inherit}
@@ -46,15 +49,15 @@ input,textarea{width:100%;background:#0d1117;border:1px solid var(--border);
 .token{font:13px/1.4 ui-monospace,Menlo,monospace;background:#0d1117;border:1px solid var(--ok);
   border-radius:10px;padding:12px;word-break:break-all}
 
-/* ---- inbox app (post-token) ---- */
-#inbox-app{display:none;height:100dvh}
+/* inbox fills below the shared chrome — no second header hop */
+#inbox-app{display:none;height:calc(100dvh - var(--chrome-h))}
 body.inbox #setup-shell{display:none}
 body.inbox #inbox-app{display:flex}
 #list-view{display:flex;flex-direction:column;width:100%;min-width:0;
   border-right:1px solid var(--border);background:var(--bg)}
-.side-head{display:flex;align-items:center;gap:10px;padding:12px 14px;
-  border-bottom:1px solid var(--border)}
-.side-head h1{margin:0;font-size:17px;letter-spacing:-.01em;flex:1}
+.side-head{display:flex;align-items:center;justify-content:flex-end;gap:4px;
+  height:var(--chrome-h);padding:0 8px;border-bottom:1px solid var(--border);
+  flex-shrink:0}
 .icon-btn{width:36px;height:36px;border-radius:10px;color:var(--dim);
   display:flex;align-items:center;justify-content:center}
 .icon-btn:hover{background:var(--panel);color:var(--fg)}
@@ -77,9 +80,9 @@ body.inbox #inbox-app{display:flex}
 #chat-view{display:none;flex:1;min-width:0;flex-direction:column;background:var(--bg)}
 #inbox-app.in-chat #chat-view{display:flex}
 #inbox-app.in-chat #list-view{display:none}
-.chat-head{display:flex;align-items:center;gap:10px;padding:10px 12px;
-  border-bottom:1px solid var(--border);background:#0d1117f2;backdrop-filter:blur(8px);
-  position:sticky;top:0;z-index:10}
+.chat-head{display:flex;align-items:center;gap:10px;height:var(--chrome-h);
+  padding:0 12px;border-bottom:1px solid var(--border);background:var(--bg);
+  flex-shrink:0}
 #btn-back{display:flex;align-items:center;gap:4px;color:var(--acc);font-size:14px;
   padding:6px 8px;border-radius:8px}
 #btn-back:hover{background:var(--acc-dim)}
@@ -161,29 +164,34 @@ body.inbox #inbox-app{display:flex}
   #chat-view{display:flex}
   #btn-back{display:none}
   #inbox-app.in-chat #list-view{display:flex}
-  .chat-head{padding:12px 16px}
+  .chat-head{padding:0 16px}
   #stream{padding:20px 24px 8px}
   .msg{max-width:66%}
   .composer{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
 }
+@media (max-width:640px){
+  .top{padding:0 10px}
+  .top nav a{padding:6px 8px}
+}
 </style>
 </head>
 <body>
-<div id="setup-shell">
 <header class="top">
-  <a class="brand" href="/">Agent Manager</a>
+  <a class="brand" href="/">Zoro</a>
   <nav>
-    <a class="on" href="/inbox/" id="nav-inbox">Inbox</a>
+    <a class="on" href="/inbox/">Inbox</a>
     <a href="/connect/">Connect</a>
     <a href="/brain/">Brain</a>
   </nav>
 </header>
+
+<div id="setup-shell">
 <main class="wrap">
-  <div class="card" id="loading"><p class="sub" style="margin:0">Checking…</p></div>
+  <div class="card" id="loading"><p class="sub" style="margin:0">…</p></div>
 
   <div class="card hidden" id="panel-bootstrap">
-    <h2>Create token</h2>
-    <p class="sub">Shown once. Save it — UI + MCP use the same value.</p>
+    <h2>Token</h2>
+    <p class="sub">Shown once. Save it.</p>
     <label for="label">Label</label>
     <input id="label" placeholder="optional">
     <div class="actions">
@@ -192,41 +200,41 @@ body.inbox #inbox-app{display:flex}
   </div>
 
   <div class="card hidden" id="panel-signup">
-    <h2>Get a free token</h2>
-    <p class="sub">Save it — same token for the UI and MCP.</p>
+    <h2>Token</h2>
+    <p class="sub">Free. Same for UI + MCP.</p>
     <label for="label2">Label</label>
     <input id="label2" placeholder="optional">
     <div id="invite-wrap" class="hidden">
       <label for="invite" style="margin-top:10px">Invite</label>
-      <input id="invite" placeholder="invite code">
+      <input id="invite" placeholder="code">
     </div>
     <div class="actions">
       <button class="btn primary" type="button" onclick="signup()">Create</button>
-      <a class="btn ghost hidden" id="btn-github" href="/api/auth/github/start">Sign in with GitHub</a>
+      <a class="btn ghost hidden" id="btn-github" href="/api/auth/github/start">GitHub</a>
     </div>
-    <p class="sub hidden" id="github-hint" style="margin-top:8px">Optional: GitHub is read-only — it only sees your public username.</p>
+    <p class="sub hidden" id="github-hint" style="margin-top:8px">Read-only username.</p>
   </div>
 
   <div class="card hidden" id="panel-locked">
-    <h2>Paste token</h2>
-    <p class="sub">Or self-host: <code>npx agent-manager-brain init && npx agent-manager-brain serve</code></p>
+    <h2>Token</h2>
+    <p class="sub">Paste or self-host.</p>
     <label for="existing">Token</label>
-    <input id="existing" type="password" placeholder="Paste token" autocomplete="current-password">
+    <input id="existing" type="password" placeholder="Paste" autocomplete="current-password">
     <div class="actions">
-      <button class="btn primary" type="button" onclick="saveExisting()">Continue</button>
+      <button class="btn primary" type="button" onclick="saveExisting()">Open</button>
       <a class="btn ghost" href="/connect/">Connect</a>
-      <a class="btn ghost hidden" id="btn-github2" href="/api/auth/github/start">Sign in with GitHub</a>
+      <a class="btn ghost hidden" id="btn-github2" href="/api/auth/github/start">GitHub</a>
     </div>
   </div>
 
   <div class="card hidden" id="panel-done">
-    <h2>Save this token</h2>
-    <p class="hint warn">Won’t be shown again.</p>
+    <h2>Save this</h2>
+    <p class="hint warn">Once only.</p>
     <div class="token" id="token-value"></div>
     <div class="actions">
       <button class="btn primary" type="button" onclick="copyToken()">Copy</button>
       <a class="btn ghost" href="/connect/">Connect</a>
-      <button class="btn ghost" type="button" onclick="enterInbox()">Open Inbox</button>
+      <button class="btn ghost" type="button" onclick="enterInbox()">Inbox</button>
     </div>
     <p class="hint okmsg" id="copied"></p>
   </div>
@@ -236,12 +244,10 @@ body.inbox #inbox-app{display:flex}
 <div id="inbox-app">
   <aside id="list-view">
     <div class="side-head">
-      <h1>Inbox</h1>
       <button class="icon-btn" type="button" title="Agents" onclick="openAgents()" aria-label="Agents">☰</button>
-      <a class="icon-btn" href="/brain/" title="Brain">◎</a>
       <button class="icon-btn" type="button" title="Sign out" onclick="signOut()" aria-label="Sign out">⎋</button>
     </div>
-    <div id="proj-list"><div class="empty">Loading…</div></div>
+    <div id="proj-list"><div class="empty">…</div></div>
   </aside>
 
   <main id="chat-view">
@@ -256,12 +262,12 @@ body.inbox #inbox-app{display:flex}
     </div>
     <div id="stream"></div>
     <div class="composer">
-      <input id="composer-title" placeholder="Title (optional)">
+      <input id="composer-title" placeholder="Title">
       <div class="c-row">
-        <textarea id="composer-input" rows="1" placeholder="Ask this thread…"></textarea>
-        <button id="btn-send" type="button" onclick="send()" aria-label="Save note">➤</button>
+        <textarea id="composer-input" rows="1" placeholder="Note…"></textarea>
+        <button id="btn-send" type="button" onclick="send()" aria-label="Send">➤</button>
       </div>
-      <div class="hint">Saved as a <b>Human</b> note in <span id="hint-proj">—</span>. Agents use <code>note</code> with <code>agent</code>/<code>to_agent</code> for Messaged lines. Enter to send.</div>
+      <div class="hint"><span id="hint-proj">—</span> · human</div>
     </div>
   </main>
 </div>
@@ -343,8 +349,7 @@ async function boot(){
 
 async function enterInbox(){
   document.body.classList.add('inbox');
-  document.title = 'Inbox — Agent Manager';
-  // Prefer /inbox/ in the URL bar once a token is live (keep /setup/ working).
+  document.title = 'Inbox — Zoro';
   if(!location.pathname.startsWith('/inbox')){
     history.replaceState(null, '', '/inbox/' + location.search + location.hash);
   }
@@ -364,7 +369,7 @@ async function enterInbox(){
 function renderList(){
   const el = $('proj-list');
   if(!PROJECTS.length){
-    el.innerHTML = '<div class="empty">No project threads yet.<br>Agents save notes with the <code>note</code> tool — one thread per repo.</div>';
+    el.innerHTML = '<div class="empty">No threads yet.</div>';
     return;
   }
   el.innerHTML = PROJECTS.map(p => {
@@ -382,7 +387,7 @@ function renderList(){
 function renderAgents(){
   const el = $('agents-list');
   if(!AGENTS.length){
-    el.innerHTML = '<div class="empty">No agent traffic yet.<br>Pass <code>agent</code> / <code>to_agent</code> on <code>note</code>.</div>';
+    el.innerHTML = '<div class="empty">No agents yet.</div>';
     return;
   }
   // Grok overlay: clean name list (no counts/avatars)
@@ -442,9 +447,9 @@ function badges(n){
 
 function renderChat(){
   const st = $('stream');
-  $('chat-sub').textContent = NOTES.length + ' notes · newest at the bottom';
+  $('chat-sub').textContent = NOTES.length ? NOTES.length + ' notes' : '';
   if(!NOTES.length){
-    st.innerHTML = '<div class="empty">No notes in this project yet.<br>Agents across repos write here with the <code>note</code> tool.</div>';
+    st.innerHTML = '<div class="empty">Empty.</div>';
     return;
   }
   let html = '', lastDay = '';

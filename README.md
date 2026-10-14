@@ -1,6 +1,6 @@
-# Agent manager
+# Zoro (agent-manager)
 
-A **shared brain for coding agents** — any platform that speaks MCP or HTTP.
+Shared brain for coding agents — MCP + HTTP. UI brand: **Zoro**.
 
 Ingest project docs, rules, memories, and live services into a local knowledge
 graph. Agents can **search**, **ask** (cited answers), pull **context packs**,
@@ -90,6 +90,8 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — UI rebrand **Zoro**: one shared 48px header on Home /
+  Inbox / Connect / Brain (no chrome hop). Minimal copy.
 - **2026-10-15** — Nav/URL say **Inbox** after login (`/inbox/` alias;
   `/setup/` still serves the same page and rewrites the path once a token
   is present).

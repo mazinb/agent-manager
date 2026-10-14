@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Manager — Shared Brain</title>
+<title>Brain — Zoro</title>
 <style>
 :root{
   --bg:#0d1117; --panel:#161b22; --border:#21262d; --border-strong:#30363d;
@@ -15,23 +15,23 @@
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--fg);
-  font:15px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif}
+  font:15px/1.45 ui-sans-serif,system-ui,sans-serif}
 a{color:var(--acc);text-decoration:none}
 
-/* —— sticky chrome: brand + tabs + controls, no layout hop —— */
+/* —— sticky chrome: shared Zoro top + tabs + controls —— */
 .chrome{position:sticky;top:0;z-index:30;background:#0d1117f5;
   backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
-.chrome-top{display:flex;align-items:center;gap:10px;height:var(--chrome-h);
+.top{display:flex;align-items:center;gap:10px;height:var(--chrome-h);
   padding:0 14px;border-bottom:1px solid var(--border)}
-.brand{font-size:14px;font-weight:650;color:var(--fg);white-space:nowrap;letter-spacing:-.01em}
-.brand:hover{color:var(--acc)}
+.top .brand{font-size:15px;font-weight:700;color:var(--fg);white-space:nowrap;letter-spacing:-.02em}
+.top .brand:hover{color:var(--acc)}
 .stats{margin-left:4px;color:var(--dim);font:12px/1 var(--mono);
   font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .stats:empty{display:none}
-.chrome-top nav{margin-left:auto;display:flex;gap:2px;flex-shrink:0}
-.chrome-top nav a{color:var(--dim);font-size:12.5px;padding:6px 9px;border-radius:6px;white-space:nowrap}
-.chrome-top nav a:hover{color:var(--fg);background:#21262d}
-.chrome-top nav a.on{color:var(--fg);background:#21262d}
+.top nav{margin-left:auto;display:flex;gap:2px;flex-shrink:0}
+.top nav a{color:var(--dim);font-size:13px;padding:6px 10px;border-radius:8px;white-space:nowrap}
+.top nav a:hover{color:var(--fg);background:#21262d}
+.top nav a.on{color:var(--acc);background:var(--acc-dim)}
 
 .tabs{display:flex;align-items:stretch;gap:0;height:var(--tabs-h);padding:0 10px;
   border-bottom:1px solid var(--border)}
@@ -127,8 +127,8 @@ code{font-family:var(--mono);font-size:.92em;background:#21262d;border-radius:4p
 .count{color:var(--dim);font-size:12px;margin:4px 0 10px;font-variant-numeric:tabular-nums}
 
 @media (max-width:640px){
-  .chrome-top{padding:0 10px;gap:8px}
-  .chrome-top nav a{padding:6px 7px}
+  .top{padding:0 10px;gap:8px}
+  .top nav a{padding:6px 8px}
   .stats{max-width:42vw}
   .tabs{padding:0 6px}
   .tabs button{padding:0 12px}
@@ -141,15 +141,15 @@ code{font-family:var(--mono);font-size:.92em;background:#21262d;border-radius:4p
 </head>
 <body>
 <div class="chrome">
-  <div class="chrome-top">
-    <a class="brand" href="/">Agent Manager</a>
+  <header class="top">
+    <a class="brand" href="/">Zoro</a>
     <span class="stats" id="stats"></span>
     <nav>
       <a href="/inbox/">Inbox</a>
       <a href="/connect/">Connect</a>
       <a class="on" href="/brain/">Brain</a>
     </nav>
-  </div>
+  </header>
   <div class="tabs" role="tablist">
     <button type="button" role="tab" data-tab="ask" class="on" aria-selected="true">Ask</button>
     <button type="button" role="tab" data-tab="graph" aria-selected="false">Entities</button>
@@ -157,13 +157,13 @@ code{font-family:var(--mono);font-size:.92em;background:#21262d;border-radius:4p
   </div>
   <div class="controls show" id="ctrl-ask">
     <div class="row">
-      <input type="text" id="q" placeholder="Ask the brain…" autocomplete="off">
+      <input type="text" id="q" placeholder="Ask…" autocomplete="off">
       <button type="button" class="act" id="ask-btn">Ask</button>
     </div>
   </div>
   <div class="controls" id="ctrl-graph">
     <div class="row">
-      <input type="search" id="entity-q" placeholder="Filter entities…" autocomplete="off">
+      <input type="search" id="entity-q" placeholder="Filter…" autocomplete="off">
     </div>
   </div>
   <div class="controls" id="ctrl-packs">

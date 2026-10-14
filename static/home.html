@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Manager</title>
+<title>Zoro</title>
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/">Agent Manager</a>
+  <a class="brand" href="/">Zoro</a>
   <nav>
     <a href="/inbox/">Inbox</a>
     <a href="/connect/">Connect</a>
@@ -16,20 +16,19 @@
   </nav>
 </header>
 <main class="wrap">
-  <h1 class="hero">Shared brain for coding agents</h1>
-  <p class="sub" id="status">…</p>
+  <h1 class="hero">Zoro</h1>
+  <p class="sub" id="status">Shared brain for agents.</p>
   <div class="actions">
-    <a class="btn primary" href="/setup/">Get token</a>
+    <a class="btn primary" href="/inbox/">Inbox</a>
     <a class="btn ghost" href="/connect/">Connect</a>
   </div>
-
   <div class="card">
     <div class="row">
       <div class="field">
         <label for="token">Token</label>
-        <input id="token" type="password" placeholder="Paste token" autocomplete="current-password">
+        <input id="token" type="password" placeholder="Paste" autocomplete="current-password">
       </div>
-      <button class="btn ok" type="button" onclick="saveToken()">Open brain</button>
+      <button class="btn ok" type="button" onclick="saveToken()">Open</button>
     </div>
   </div>
 </main>
@@ -38,9 +37,9 @@ const $ = id => document.getElementById(id);
 async function boot(){
   try{
     const s = await fetch('/api/setup/status').then(r=>r.json());
-    if(s.bootstrap) $('status').innerHTML = 'No token yet — <a href="/setup/">create one</a>.';
-    else if(s.signup_open) $('status').innerHTML = 'Free hosted — <a href="/setup/">get a token</a> to try.';
-    else $('status').textContent = 'Private brain. Paste a token or self-host.';
+    if(s.bootstrap) $('status').innerHTML = 'No token — <a href="/inbox/">create one</a>.';
+    else if(s.signup_open) $('status').innerHTML = 'Free — <a href="/inbox/">get a token</a>.';
+    else $('status').textContent = 'Paste a token or self-host.';
   }catch{ $('status').textContent = 'Offline.'; }
   const t = localStorage.getItem('am_token')||'';
   if(t) $('token').value = t;
@@ -49,7 +48,7 @@ function saveToken(){
   const t = $('token').value.trim();
   if(!t) return;
   localStorage.setItem('am_token', t);
-  location.href = '/brain/';
+  location.href = '/inbox/';
 }
 boot();
 </script>

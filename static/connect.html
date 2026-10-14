@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Connect — Agent Manager</title>
-<!-- Self-contained: no /static/app.css round-trip through the Spark tunnel. -->
+<title>Connect — Zoro</title>
+<!-- Self-contained (edge cache); chrome matches /static/app.css -->
 <style>
 :root{
   --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#e6edf3;
   --dim:#8b949e; --acc:#58a6ff; --acc-dim:#58a6ff33; --ok:#3fb950; --warn:#d29922;
+  --chrome-h:48px;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);
@@ -16,34 +17,34 @@ body{margin:0;background:var(--bg);color:var(--fg);
 a{color:var(--acc);text-decoration:none}
 code,pre{font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
 
-.top{display:flex;align-items:center;gap:10px;padding:12px 16px;
-  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;
+.top{display:flex;align-items:center;gap:10px;height:var(--chrome-h);
+  padding:0 14px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30;
   background:#0d1117f5;backdrop-filter:blur(10px)}
-.brand{font-size:15px;font-weight:650;color:var(--fg)}
-.brand:hover{color:var(--acc)}
+.top .brand{font-size:15px;font-weight:700;color:var(--fg);letter-spacing:-.02em}
+.top .brand:hover{color:var(--acc)}
 .top nav{margin-left:auto;display:flex;gap:2px}
 .top nav a{color:var(--dim);font-size:13px;padding:6px 10px;border-radius:8px}
 .top nav a:hover{color:var(--fg);background:#21262d}
 .top nav a.on{color:var(--acc);background:var(--acc-dim)}
 
-.wrap{max-width:640px;margin:0 auto;padding:22px 16px 72px}
-.hero{font-size:clamp(24px,5vw,32px);line-height:1.15;margin:0 0 8px;letter-spacing:-.02em}
-.sub{color:var(--dim);margin:0 0 18px}
+.wrap{max-width:560px;margin:0 auto;padding:20px 16px 72px}
+.hero{font-size:clamp(22px,4vw,28px);line-height:1.15;margin:0 0 6px;letter-spacing:-.02em;font-weight:650}
+.sub{color:var(--dim);margin:0 0 16px;font-size:14px}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
   padding:14px 16px;margin:0 0 12px}
-.card h2{margin:0 0 10px;font-size:15px}
+.card h2{margin:0 0 10px;font-size:15px;font-weight:600}
 label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 input{width:100%;background:#0d1117;border:1px solid var(--border);color:var(--fg);
   border-radius:8px;padding:10px 12px;font:inherit}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .field{flex:1;min-width:160px}
 .hint{font-size:12px;color:var(--dim);margin:8px 0 0}
-.okmsg{color:var(--ok)}.warn{color:var(--warn)}
+.okmsg{color:var(--ok)}
 
 .cta{display:flex;flex-direction:column;gap:10px}
 .btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;
-  gap:8px;width:100%;padding:14px 16px;border-radius:10px;font-weight:700;
-  font-size:15px;border:1px solid transparent;cursor:pointer}
+  gap:8px;width:100%;padding:12px 16px;border-radius:10px;font-weight:650;
+  font-size:14px;border:1px solid transparent;cursor:pointer}
 .btn.primary{background:var(--acc);color:#04121f}
 .btn.primary:active{transform:translateY(1px)}
 .btn.primary.ok{background:var(--ok)}
@@ -69,14 +70,14 @@ details.more[open] > summary::after{content:"Hide"}
 .copy.ok{border-color:var(--ok);color:var(--ok)}
 
 @media (max-width:640px){
-  .top{padding:10px 12px}
+  .top{padding:0 10px}
   .wrap{padding:16px 12px 64px}
 }
 </style>
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/">Agent Manager</a>
+  <a class="brand" href="/">Zoro</a>
   <nav>
     <a href="/inbox/">Inbox</a>
     <a class="on" href="/connect/">Connect</a>
@@ -84,33 +85,32 @@ details.more[open] > summary::after{content:"Hide"}
   </nav>
 </header>
 <main class="wrap">
-  <h1 class="hero">One click to your agent</h1>
-  <p class="sub" id="status">Paste your token, then copy. No Spark round-trip — this page is static.</p>
+  <h1 class="hero">Connect</h1>
+  <p class="sub" id="status">Paste token. One click.</p>
 
   <div class="card">
     <div class="row">
       <div class="field">
-        <label for="base">Brain URL</label>
+        <label for="base">URL</label>
         <input id="base" value="https://bot.getzoro.com" autocomplete="url" spellcheck="false">
       </div>
       <div class="field">
         <label for="token">Token</label>
-        <input id="token" type="password" placeholder="from /setup/" autocomplete="current-password" spellcheck="false">
+        <input id="token" type="password" placeholder="Paste" autocomplete="current-password" spellcheck="false">
       </div>
     </div>
-    <p class="hint" id="token-hint"><a href="/setup/">Get a free token</a> if you don’t have one.</p>
+    <p class="hint" id="token-hint"><a href="/inbox/">Get a token</a></p>
   </div>
 
   <div class="card cta">
     <h2>Cursor</h2>
     <div class="row" style="margin-bottom:10px">
-      <a class="btn primary" id="deeplink-cursor" href="/setup/">Install in Cursor — one click</a>
-      <a class="btn ghost" id="deeplink-vscode" href="/setup/">Install in VS Code</a>
+      <a class="btn primary" id="deeplink-cursor" href="/inbox/">Install in Cursor</a>
+      <a class="btn ghost" id="deeplink-vscode" href="/inbox/">VS Code</a>
     </div>
-    <p class="hint" id="deeplink-hint">Get a token first — then these write <code>~/.cursor/mcp.json</code> / VS Code MCP config via the official install links, no terminal.</p>
-    <pre class="cmd" id="cursor-cmd" style="margin-top:10px">npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent cursor</pre>
-    <button type="button" class="btn primary" id="copy-cursor">Copy Cursor command</button>
-    <p class="hint">Runs locally on your machine. Writes <code>~/.cursor/mcp.json</code>. The brain stays on the host — this page never calls it.</p>
+    <p class="hint" id="deeplink-hint">Needs a token.</p>
+    <pre class="cmd" id="cursor-cmd">npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent cursor</pre>
+    <button type="button" class="btn primary" id="copy-cursor">Copy</button>
   </div>
 
   <details class="more" id="more">
@@ -167,9 +167,6 @@ function cursorCmd() {
   return `npx --yes agent-manager-brain connect --url ${base()}${tokFlag()} --agent cursor`;
 }
 
-// One-click install links (official formats):
-//   Cursor: cursor://anysphere.cursor-deeplink/mcp/install?name=NAME&config=BASE64(json)
-//   VS Code: vscode:mcp/install?name=NAME&config=URLENCODED(json)
 function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
 function deeplinkConfig() {
   const t = token();
@@ -196,12 +193,12 @@ const PLATFORMS = [
   { id:'claude', label:'Claude', title:'Claude Code',
     code(){ const h = token() ? ` \\\n  --header "X-Token: ${token()}"` : '';
       return `claude mcp add --transport http agent-manager ${mcpUrl()}${h}`; }},
-  { id:'vscode', label:'VS Code', title:'VS Code / Copilot', code:()=>mcpJson('vscode') },
+  { id:'vscode', label:'VS Code', title:'VS Code', code:()=>mcpJson('vscode') },
   { id:'windsurf', label:'Windsurf', title:'Windsurf', code:()=>mcpJson('generic') },
   { id:'cline', label:'Cline', title:'Cline', code:()=>mcpJson('generic') },
   { id:'continue', label:'Continue', title:'Continue', code:()=>mcpJson('continue') },
   { id:'zed', label:'Zed', title:'Zed', code:()=>mcpJson('zed') },
-  { id:'npx', label:'npm', title:'npx (any agent)',
+  { id:'npx', label:'npm', title:'npm',
     code(){ return `npx --yes agent-manager-brain connect --url ${base()}${tokFlag()} --agent vscode`; }},
   { id:'selfhost', label:'Self-host', title:'Self-host',
     code(){ return [
@@ -210,7 +207,7 @@ const PLATFORMS = [
       `npx --yes agent-manager-brain connect --url http://127.0.0.1:8075${tokFlag()} --agent generic`,
     ].join('\n'); }},
   { id:'generic', label:'JSON', title:'MCP JSON', code:()=>mcpJson('generic') },
-  { id:'curl', label:'curl', title:'curl smoke',
+  { id:'curl', label:'curl', title:'curl',
     code(){ const t=token()||'YOUR_TOKEN';
       return `curl -s "${base()}/api/search?q=test" -H "X-Token: ${t}"`; }},
 ];
@@ -222,19 +219,15 @@ function persist() {
   localStorage.setItem('am_base', base());
   if (token()) localStorage.setItem('am_token', token());
   const has = !!token();
-  $('status').textContent = has
-    ? 'Token stays in your browser — this page never talks to the brain.'
-    : 'Paste your token, then copy. No Spark round-trip — this page is static.';
+  $('status').textContent = has ? 'Ready.' : 'Paste token. One click.';
   $('token-hint').innerHTML = has
-    ? '<span class="okmsg">Token ready.</span>'
-    : '<a href="/setup/">Get a free token</a> if you don’t have one.';
+    ? '<span class="okmsg">Ready.</span>'
+    : '<a href="/inbox/">Get a token</a>';
   $('cursor-cmd').textContent = cursorCmd();
   const cl = cursorDeeplink(), vl = vscodeDeeplink();
-  $('deeplink-cursor').href = cl || '/setup/';
-  $('deeplink-vscode').href = vl || '/setup/';
-  $('deeplink-hint').innerHTML = cl
-    ? 'One click opens Cursor / VS Code and adds the brain to its MCP config. The token rides inside the local config, like any MCP key.'
-    : 'Get a token first — then these write <code>~/.cursor/mcp.json</code> / VS Code MCP config via the official install links, no terminal.';
+  $('deeplink-cursor').href = cl || '/inbox/';
+  $('deeplink-vscode').href = vl || '/inbox/';
+  $('deeplink-hint').textContent = cl ? 'Opens Cursor / VS Code.' : 'Needs a token.';
 }
 
 async function copyText(text, btn, okLabel) {
@@ -248,7 +241,7 @@ async function copyText(text, btn, okLabel) {
     const r = document.createRange();
     r.selectNodeContents($('cursor-cmd'));
     const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-    btn.textContent = 'Select & copy';
+    btn.textContent = 'Select';
   }
 }
 
@@ -271,7 +264,7 @@ function render() {
   renderMore();
 }
 
-$('copy-cursor').onclick = ev => copyText(cursorCmd(), ev.currentTarget, 'Copied — paste in a terminal');
+$('copy-cursor').onclick = ev => copyText(cursorCmd(), ev.currentTarget, 'Copied');
 $('tabs').onclick = e => {
   const b = e.target.closest('button[data-id]');
   if (!b) return;
@@ -281,7 +274,6 @@ $('tabs').onclick = e => {
 $('base').addEventListener('input', render);
 $('token').addEventListener('input', render);
 
-// If ?agent= opens a non-cursor target, expand the secondary panel.
 if (qs.get('agent') && qs.get('agent') !== 'cursor') {
   $('more').open = true;
   ACTIVE = qs.get('agent');
