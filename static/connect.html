@@ -48,6 +48,9 @@ pre { margin:0; background:#0d1117; border:1px solid var(--border); border-radiu
   <p class="lead">
     Agent Manager is a shared brain over MCP. Point any coding agent at it —
     Cursor, Claude Code, VS Code, Windsurf, Cline, Continue, Zed, Codex, or a raw HTTP client.
+    npm package: <code style="color:var(--fg)">agent-manager-brain</code>
+    (<a href="https://www.npmjs.com/package/agent-manager-brain">npm</a> ·
+    <a href="https://github.com/mazinb/agent-manager/tree/main/npm">source</a>).
   </p>
 
   <div class="row">
@@ -134,16 +137,18 @@ const PLATFORMS = [
   {
     id: 'oneclick',
     label: 'One-click',
-    title: 'One-liner setup',
+    title: 'One-liner setup (npm)',
     steps: [
       'Copy the command for your agent.',
-      'Run it in a terminal on your machine.',
+      'Run it in a terminal on your machine (Node 18+).',
       'Restart the agent app if it was already open.',
     ],
     code() {
       const t = token();
       const tok = t ? ` --token ${t}` : ' --token YOUR_TOKEN';
       return [
+        `# package: npm i -g agent-manager-brain   OR use npx below`,
+        ``,
         `# Cursor`,
         `npx --yes agent-manager-brain connect --url ${base()}${tok} --agent cursor`,
         ``,
@@ -167,6 +172,35 @@ const PLATFORMS = [
         ``,
         `# Print generic MCP JSON`,
         `npx --yes agent-manager-brain connect --url ${base()}${tok} --agent generic`,
+      ].join('\n');
+    }
+  },
+  {
+    id: 'selfhost',
+    label: 'Self-host',
+    title: 'Self-host locally (npm)',
+    steps: [
+      'Needs Node 18+, git, and python3 on your PATH.',
+      'init clones the server and writes .env + config.',
+      'serve starts http://127.0.0.1:8075 (UI + /mcp).',
+      'Then connect your agent to the local URL.',
+    ],
+    code() {
+      return [
+        `# 1) Install / bootstrap`,
+        `npx --yes agent-manager-brain init`,
+        ``,
+        `# 2) Run the brain (Python stdlib server, orchestrated by npm)`,
+        `npx --yes agent-manager-brain serve`,
+        ``,
+        `# 3) Point your agent at local MCP`,
+        `npx --yes agent-manager-brain connect \\`,
+        `  --url http://127.0.0.1:8075 \\`,
+        `  --token "$(grep AGENT_MANAGER_TOKEN ~/.agent-manager/app/.env | cut -d= -f2)" \\`,
+        `  --agent cursor`,
+        ``,
+        `# Optional: open the same one-click UI locally`,
+        `# http://127.0.0.1:8075/connect/`,
       ].join('\n');
     }
   },

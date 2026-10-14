@@ -12,6 +12,15 @@ Fastest path: open **`{BASE}/connect/`**, paste your token, pick a platform, **C
 
 ---
 
+## npm package
+
+```bash
+npx --yes agent-manager-brain …        # no install required
+npm i -g agent-manager-brain           # optional global bin
+```
+
+Package: [`agent-manager-brain`](https://www.npmjs.com/package/agent-manager-brain)
+
 ## One-click CLI
 
 ```bash
@@ -31,6 +40,30 @@ npx --yes agent-manager-brain connect \
 | `continue` | Appends to `~/.continue/config.yaml` |
 | `zed` | Prints a `context_servers` block for `settings.json` |
 | `codex` / `gemini` / `generic` | Prints portable MCP JSON |
+
+---
+
+## Self-host (local MCP)
+
+```bash
+npx --yes agent-manager-brain init
+npx --yes agent-manager-brain serve
+# UI:  http://127.0.0.1:8075/connect/
+# MCP: http://127.0.0.1:8075/mcp
+
+npx --yes agent-manager-brain connect \
+  --url http://127.0.0.1:8075 \
+  --token "$(grep AGENT_MANAGER_TOKEN ~/.agent-manager/app/.env | cut -d= -f2)" \
+  --agent cursor
+```
+
+Requires Node 18+, `git`, and `python3`. The server is Python stdlib; npm
+clones and runs it. Optional Python install of the same repo:
+
+```bash
+pip install -e .
+agent-manager serve
+```
 
 ---
 

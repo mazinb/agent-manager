@@ -20,6 +20,8 @@ Self-hosted. Stdlib-only Python. One process.
 
 ## Connect in 30 seconds
 
+npm package: **[`agent-manager-brain`](https://www.npmjs.com/package/agent-manager-brain)**
+
 Open **[/connect/](https://bot.getzoro.com/connect/)**, paste your access token,
 pick your agent, hit **Copy**.
 
@@ -38,6 +40,17 @@ npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR
 
 Supported `--agent` values: `cursor`, `claude`, `vscode`, `copilot`, `windsurf`,
 `cline`, `continue`, `zed`, `codex`, `gemini`, `generic`.
+
+### Self-host via npm
+
+```bash
+npx --yes agent-manager-brain init     # clone + .env + config
+npx --yes agent-manager-brain serve    # http://127.0.0.1:8075  (needs python3)
+npx --yes agent-manager-brain connect \
+  --url http://127.0.0.1:8075 \
+  --token "$(grep AGENT_MANAGER_TOKEN ~/.agent-manager/app/.env | cut -d= -f2)" \
+  --agent cursor
+```
 
 Full step-by-step for each platform: **[docs/CONNECT.md](docs/CONNECT.md)**.
 

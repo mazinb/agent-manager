@@ -1,11 +1,37 @@
 {
   "name": "agent-manager-brain",
-  "version": "0.3.1",
-  "description": "One-click connect any coding agent to an agent-manager shared brain (MCP + REST).",
+  "version": "0.3.2",
+  "description": "Shared brain for coding agents — connect, self-host, and query over MCP/REST.",
   "license": "MIT",
   "type": "commonjs",
-  "bin": { "agent-manager-brain": "cli.js" },
-  "engines": { "node": ">=18" },
-  "repository": { "type": "git", "url": "https://github.com/mazinb/agent-manager" },
-  "keywords": ["agent-manager", "mcp", "agents", "context", "cursor", "claude", "vscode"]
+  "bin": {
+    "agent-manager-brain": "cli.js"
+  },
+  "files": [
+    "cli.js",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node cli.js help"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mazinb/agent-manager.git",
+    "directory": "npm"
+  },
+  "homepage": "https://bot.getzoro.com/connect/",
+  "bugs": {
+    "url": "https://github.com/mazinb/agent-manager/issues"
+  },
+  "keywords": [
+    "agent-manager",
+    "mcp",
+    "agents",
+    "context",
+    "memory",
+    "self-hosted"
+  ]
 }

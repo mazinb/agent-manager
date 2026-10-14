@@ -1,17 +1,24 @@
 #!/usr/bin/env node
 /* agent-manager-brain — connect any coding agent to a shared brain.
  *
- *   agent-manager-brain connect --url https://host --token TOK --agent <platform>
- *   agent-manager-brain ask|search|pack|note|stats …
+ *   npx agent-manager-brain connect --url https://host --token TOK --agent <platform>
+ *   npx agent-manager-brain init [--dir ~/agent-manager]
+ *   npx agent-manager-brain serve [--dir DIR] [--port 8075]
+ *   npx agent-manager-brain ask|search|pack|note|stats …
  *
  * Platforms: cursor, claude, vscode, copilot, windsurf, cline, continue,
  *            zed, codex, gemini, generic
  *
- * Env: AGENT_MANAGER_URL, AGENT_MANAGER_TOKEN
+ * Env: AGENT_MANAGER_URL, AGENT_MANAGER_TOKEN, AGENT_MANAGER_HOME
  */
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawn, spawnSync } = require("child_process");
+
+const REPO = "https://github.com/mazinb/agent-manager.git";
+const DEFAULT_HOME = process.env.AGENT_MANAGER_HOME
+  || path.join(os.homedir(), ".agent-manager", "app");
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -74,6 +81,106 @@ function printGeneric(url, token, name) {
   console.log(JSON.stringify({ mcpServers: { [name]: mcpEntry(url, token) } }, null, 2));
 }
 
+function ensureRepo(dir) {
+  const server = path.join(dir, "server.py");
+  if (fs.existsSync(server)) return dir;
+  fs.mkdirSync(path.dirname(dir), { recursive: true });
+  if (fs.existsSync(path.join(dir, ".git"))) {
+    console.log(`updating ${dir}`);
+    const r = spawnSync("git", ["-C", dir, "pull", "--ff-only"], { stdio: "inherit" });
+    if (r.status !== 0) process.exit(r.status || 1);
+  } else {
+    console.log(`cloning ${REPO} → ${dir}`);
+    const r = spawnSync("git", ["clone", "--depth", "1", REPO, dir], { stdio: "inherit" });
+    if (r.status !== 0) process.exit(r.status || 1);
+  }
+  if (!fs.existsSync(server)) {
+    console.error(`clone succeeded but ${server} is missing`);
+    process.exit(1);
+  }
+  return dir;
+}
+
+function ensureEnv(dir, token) {
+  const envPath = path.join(dir, ".env");
+  if (fs.existsSync(envPath)) return envPath;
+  const tok = token || TOKEN || require("crypto").randomBytes(16).toString("hex");
+  fs.writeFileSync(envPath,
+    `AGENT_MANAGER_TOKEN=${tok}\nAGENT_MANAGER_PORT=8075\n`);
+  console.log(`wrote ${envPath}`);
+  console.log(`token: ${tok}`);
+  return envPath;
+}
+
+function ensureConfig() {
+  const cfgDir = path.join(os.homedir(), ".config", "agent-manager");
+  const cfg = path.join(cfgDir, "config.json");
+  if (fs.existsSync(cfg)) return cfg;
+  fs.mkdirSync(cfgDir, { recursive: true });
+  const example = {
+    _comment: "agent-manager brain config (token lives in .env)",
+    db_path: path.join(os.homedir(), ".local", "share", "agent-manager", "brain.db"),
+    rebuild_fts: true,
+    llm: {},
+    sources: [
+      {
+        type: "files",
+        tag: "project_readme",
+        roots: [path.join(os.homedir(), "projects", "*")],
+        include: ["README.md"],
+        max_depth: 2,
+      },
+      { type: "services" },
+    ],
+  };
+  fs.writeFileSync(cfg, JSON.stringify(example, null, 2) + "\n");
+  console.log(`wrote ${cfg}`);
+  return cfg;
+}
+
+function initCmd(args) {
+  const dir = path.resolve(args.dir || DEFAULT_HOME);
+  ensureRepo(dir);
+  const envPath = ensureEnv(dir, args.token);
+  const cfg = ensureConfig();
+  const tok = fs.readFileSync(envPath, "utf8").match(/AGENT_MANAGER_TOKEN=(.+)/)?.[1]?.trim();
+  console.log(`\nSelf-host ready in ${dir}`);
+  console.log(`\nNext:`);
+  console.log(`  npx agent-manager-brain serve --dir ${dir}`);
+  console.log(`  npx agent-manager-brain connect --url http://127.0.0.1:8075 --token ${tok || "YOUR_TOKEN"} --agent cursor`);
+  console.log(`\nConfig: ${cfg}`);
+  console.log(`UI:     http://127.0.0.1:8075/connect/`);
+}
+
+function serveCmd(args) {
+  const dir = ensureRepo(path.resolve(args.dir || DEFAULT_HOME));
+  ensureEnv(dir, args.token);
+  ensureConfig();
+  const port = String(args.port || process.env.AGENT_MANAGER_PORT || "8075");
+  const py = process.env.PYTHON || "python3";
+  const check = spawnSync(py, ["--version"], { encoding: "utf8" });
+  if (check.status !== 0) {
+    console.error("python3 is required to self-host the brain server.");
+    console.error("Install Python 3.9+, then re-run: npx agent-manager-brain serve");
+    process.exit(1);
+  }
+  console.log(`starting agent-manager on :${port} from ${dir}`);
+  console.log(`connect UI: http://127.0.0.1:${port}/connect/`);
+  console.log(`MCP:        http://127.0.0.1:${port}/mcp`);
+  const child = spawn(py, ["server.py"], {
+    cwd: dir,
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      AGENT_MANAGER_PORT: port,
+      AGENT_MANAGER_CONFIG:
+        process.env.AGENT_MANAGER_CONFIG
+        || path.join(os.homedir(), ".config", "agent-manager", "config.json"),
+    },
+  });
+  child.on("exit", code => process.exit(code || 0));
+}
+
 function connect(args) {
   const base = requireBase(args);
   const url = base + "/mcp";
@@ -83,7 +190,6 @@ function connect(args) {
   if (agent === "copilot") agent = "vscode";
 
   if (agent === "claude") {
-    const { spawnSync } = require("child_process");
     const hdr = token ? ["--header", `X-Token: ${token}`] : [];
     const r = spawnSync("claude",
       ["mcp", "add", "--transport", "http", name, url, ...hdr],
@@ -178,7 +284,6 @@ function connect(args) {
     return;
   }
 
-  // codex, gemini, generic
   printGeneric(url, token, name);
 }
 
@@ -187,6 +292,8 @@ async function main() {
   const cmd = args._[0] || "help";
   try {
     if (cmd === "connect") return connect(args);
+    if (cmd === "init") return initCmd(args);
+    if (cmd === "serve") return serveCmd(args);
     if (cmd === "help") { console.log(__doc); return; }
     const base = requireBase(args);
     const token = args.token || TOKEN;
@@ -225,13 +332,16 @@ const __doc = `agent-manager-brain — shared brain for any coding agent
   connect  --url https://host --token TOK --agent <platform>
            platforms: cursor claude vscode copilot windsurf cline
                       continue zed codex gemini generic
-  ask      "question" --url U [--token T] [--no-llm]
-  search   "query"
-  pack     <project>
-  note     --project my-agent --title "setup" --body "..."
-  stats
+  init     [--dir ~/.agent-manager/app]   clone + write .env/config
+  serve    [--dir DIR] [--port 8075]      run local brain (needs python3)
+  ask|search|pack|note|stats              query a running brain
 
-Env: AGENT_MANAGER_URL, AGENT_MANAGER_TOKEN
-UI:  {url}/connect/`;
+Self-host (all via npm):
+  npx agent-manager-brain init
+  npx agent-manager-brain serve
+  npx agent-manager-brain connect --url http://127.0.0.1:8075 --token TOK --agent cursor
+
+Env: AGENT_MANAGER_URL, AGENT_MANAGER_TOKEN, AGENT_MANAGER_HOME
+UI:  {url}/connect/   npm: agent-manager-brain`;
 
 main();
