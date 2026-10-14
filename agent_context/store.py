@@ -1,4 +1,6 @@
 """SQLite store: sources, chunks (FTS5), entities, mentions, edges."""
+import hashlib
+import json
 import os
 import sqlite3
 import time
@@ -43,6 +45,23 @@ CREATE INDEX IF NOT EXISTS idx_chunks_source ON chunks(source_id);
 CREATE INDEX IF NOT EXISTS idx_mentions_chunk ON mentions(chunk_id);
 """
 
+# Trust/provenance columns (added idempotently — old DBs migrate in place).
+TRUST_COLUMNS = (
+    ("content_hash", "TEXT DEFAULT ''"),
+    ("verified_at", "REAL DEFAULT 0"),
+    ("confidence", "REAL"),
+    ("stale", "INTEGER DEFAULT 0"),
+    ("based_on", "TEXT"),
+)
+
+
+def _ensure_trust_columns(con):
+    have = {r[1] for r in con.execute("PRAGMA table_info(sources)")}
+    for name, decl in TRUST_COLUMNS:
+        if name not in have:
+            con.execute(f"ALTER TABLE sources ADD COLUMN {name} {decl}")
+    con.commit()
+
 
 def connect(db_path):
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
@@ -51,24 +70,38 @@ def connect(db_path):
     con.execute("PRAGMA foreign_keys=ON")
     con.execute("PRAGMA journal_mode=WAL")
     con.executescript(SCHEMA)
+    _ensure_trust_columns(con)
     return con
+
+
+def content_hash(text_chunks):
+    """Stable sha256 over a source's chunk texts."""
+    h = hashlib.sha256()
+    for _heading, text in text_chunks:
+        h.update(text.encode("utf-8", "replace"))
+        h.update(b"\x00")
+    return h.hexdigest()
 
 
 def upsert_source(con, path, kind, project, mtime, size, text_chunks):
     """Insert/replace a source and its chunks. text_chunks: [(heading, text)]"""
+    chash = content_hash(text_chunks)
     cur = con.execute("SELECT id FROM sources WHERE path=?", (path,))
     row = cur.fetchone()
     now = time.time()
     if row:
         sid = row["id"]
+        con.execute("DELETE FROM chunks_fts WHERE rowid IN "
+                    "(SELECT id FROM chunks WHERE source_id=?)", (sid,))
         con.execute("DELETE FROM chunks WHERE source_id=?", (sid,))
         con.execute(
-            "UPDATE sources SET kind=?, project=?, mtime=?, size=?, ingested_at=? "
-            "WHERE id=?", (kind, project, mtime, size, now, sid))
+            "UPDATE sources SET kind=?, project=?, mtime=?, size=?, ingested_at=?, "
+            "content_hash=? WHERE id=?",
+            (kind, project, mtime, size, now, chash, sid))
     else:
         cur = con.execute(
-            "INSERT INTO sources(path, kind, project, mtime, size, ingested_at) "
-            "VALUES(?,?,?,?,?,?)", (path, kind, project, mtime, size, now))
+            "INSERT INTO sources(path, kind, project, mtime, size, ingested_at, content_hash) "
+            "VALUES(?,?,?,?,?,?,?)", (path, kind, project, mtime, size, now, chash))
         sid = cur.lastrowid
     for i, (heading, text) in enumerate(text_chunks):
         cur = con.execute(
@@ -78,6 +111,14 @@ def upsert_source(con, path, kind, project, mtime, size, text_chunks):
         con.execute("INSERT INTO chunks_fts(rowid, text, heading) VALUES(?,?,?)",
                     (cid, text, heading))
     return sid
+
+
+def set_note_meta(con, sid, confidence=None, based_on=None):
+    """Trust metadata for a note: (re)saving refreshes verified_at and clears
+    the stale flag. based_on: list of source paths the note was derived from."""
+    con.execute(
+        "UPDATE sources SET verified_at=?, stale=0, confidence=?, based_on=? WHERE id=?",
+        (time.time(), confidence, json.dumps(based_on) if based_on else None, sid))
 
 
 def prune_stale(con, live_paths):

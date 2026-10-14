@@ -64,17 +64,27 @@ def _note(brain, args):
     from . import store
     from .ingest import _chunk_markdown
     import time
-    project = re.sub(r"[^a-z0-9._-]", "-",
-                     (args.get("project") or "").lower()).strip("-")[:64]
+    project = re.sub(r"[^a-z0-9._-]", "-", (args.get("project") or "").lower()).strip("-")[:64]
     title = (args.get("title") or "untitled").strip()[:200]
     body = (args.get("body") or "").strip()[:65536]
     if not project:
         raise ValueError("project is required (lowercase slug, e.g. 'my-agent')")
     if not body:
         raise ValueError("body is required")
-    store.upsert_source(
+    confidence = args.get("confidence")
+    if confidence is not None:
+        confidence = float(confidence)
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError("confidence must be between 0.0 and 1.0")
+    based_on = args.get("sources")
+    if based_on is not None:
+        if not isinstance(based_on, list) or not all(isinstance(s, str) for s in based_on):
+            raise ValueError("sources must be a list of paths (e.g. the repo files the note is based on)")
+        based_on = [s[:512] for s in based_on[:32]]
+    sid = store.upsert_source(
         brain.con, f"note:{project}/{title}", "note", project,
         time.time(), len(body), _chunk_markdown(f"# {title}\n\n{body}"))
+    store.set_note_meta(brain.con, sid, confidence=confidence, based_on=based_on)
     brain.con.commit()
     return {"ok": True, "project": project, "title": title}
 
@@ -101,10 +111,17 @@ TOOLS = [
     {"name": "stats", "description": "Brain statistics.",
      "inputSchema": {"type": "object", "properties": {}}},
     {"name": "note", "description": "Share context: write a note into the brain under a "
-     "project (space). Upserted by title within the project.",
+     "project (space). Upserted by title within the project. Optionally give a "
+     "confidence (0-1) and the source paths the note is based on — when those "
+     "sources change later, the note is flagged stale until re-saved.",
      "inputSchema": {"type": "object", "properties": {
          "project": {"type": "string"}, "title": {"type": "string"},
-         "body": {"type": "string"}}, "required": ["project", "body"]}},
+         "body": {"type": "string"},
+         "confidence": {"type": "number", "minimum": 0, "maximum": 1,
+                        "description": "How sure you are the note is still accurate (0-1)."},
+         "sources": {"type": "array", "items": {"type": "string"},
+                     "description": "Repo paths the note is derived from, e.g. [\"README.md\"]."}},
+         "required": ["project", "body"]}},
 ]
 
 TOOL_FUNCS = {t["name"]: f for t, f in zip(
