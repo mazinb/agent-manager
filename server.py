@@ -289,10 +289,10 @@ class Handler(BaseHTTPRequestHandler):
                               "text/html; charset=utf-8",
                               cache="public, max-age=60, s-maxage=300")
         if path in ("/connect", "/connect/"):
-            # Fully static one-click page (no API). Cache hard at the edge so
-            # phones don't wait on the Spark tunnel for a copy button.
+            # Static shell; short edge TTL so UI deploys show up on phones.
             return self._file(os.path.join(STATIC, "connect.html"),
-                              "text/html; charset=utf-8", cache=EDGE)
+                              "text/html; charset=utf-8",
+                              cache="public, max-age=60, s-maxage=120")
         if path in ("/brain", "/brain/"):
             return self._file(os.path.join(BRAIN_STATIC, "index.html"),
                               "text/html; charset=utf-8",

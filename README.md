@@ -90,6 +90,9 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — Connect UX: fixed (non-editable) brain URL, create /
+  view-once token, agent grid + custom add. Commands redact the token on
+  screen; copy/deeplink still carry it. Shorter edge cache so phones update.
 - **2026-10-15** — Cursor↔Hermes loop on peers bus: plan → handoff →
   supervise (`docs/PEER-INBOX.md`, `scripts/peer.sh`). Hermes skill updated.
 - **2026-10-15** — UI rebrand **Zoro**: one shared 48px header on Home /

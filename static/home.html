@@ -19,17 +19,8 @@
   <h1 class="hero">Zoro</h1>
   <p class="sub" id="status">Shared brain for agents.</p>
   <div class="actions">
-    <a class="btn primary" href="/inbox/">Inbox</a>
-    <a class="btn ghost" href="/connect/">Connect</a>
-  </div>
-  <div class="card">
-    <div class="row">
-      <div class="field">
-        <label for="token">Token</label>
-        <input id="token" type="password" placeholder="Paste" autocomplete="current-password">
-      </div>
-      <button class="btn ok" type="button" onclick="saveToken()">Open</button>
-    </div>
+    <a class="btn primary" href="/connect/">Connect</a>
+    <a class="btn ghost" href="/inbox/">Inbox</a>
   </div>
 </main>
 <script>
@@ -37,18 +28,10 @@ const $ = id => document.getElementById(id);
 async function boot(){
   try{
     const s = await fetch('/api/setup/status').then(r=>r.json());
-    if(s.bootstrap) $('status').innerHTML = 'No token — <a href="/inbox/">create one</a>.';
-    else if(s.signup_open) $('status').innerHTML = 'Free — <a href="/inbox/">get a token</a>.';
-    else $('status').textContent = 'Paste a token or self-host.';
+    if(s.bootstrap || s.signup_open)
+      $('status').innerHTML = 'Get a token on <a href="/connect/">Connect</a>.';
+    else $('status').textContent = 'Self-host or open Connect.';
   }catch{ $('status').textContent = 'Offline.'; }
-  const t = localStorage.getItem('am_token')||'';
-  if(t) $('token').value = t;
-}
-function saveToken(){
-  const t = $('token').value.trim();
-  if(!t) return;
-  localStorage.setItem('am_token', t);
-  location.href = '/inbox/';
 }
 boot();
 </script>

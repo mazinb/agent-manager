@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Connect — Zoro</title>
-<!-- Self-contained (edge cache); chrome matches /static/app.css -->
+<!-- Self-contained for edge cache; chrome matches app.css -->
 <style>
 :root{
   --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#e6edf3;
-  --dim:#8b949e; --acc:#58a6ff; --acc-dim:#58a6ff33; --ok:#3fb950; --warn:#d29922;
-  --chrome-h:48px;
+  --dim:#8b949e; --faint:#6e7681; --acc:#58a6ff; --acc-dim:#58a6ff33;
+  --ok:#3fb950; --warn:#d29922; --chrome-h:48px;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);
@@ -34,40 +34,51 @@ code,pre{font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
   padding:14px 16px;margin:0 0 12px}
 .card h2{margin:0 0 10px;font-size:15px;font-weight:600}
 label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
-input{width:100%;background:#0d1117;border:1px solid var(--border);color:var(--fg);
-  border-radius:8px;padding:10px 12px;font:inherit}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-.field{flex:1;min-width:160px}
 .hint{font-size:12px;color:var(--dim);margin:8px 0 0}
-.okmsg{color:var(--ok)}
+.warn{color:var(--warn)}.okmsg{color:var(--ok)}
+.hidden{display:none!important}
 
-.cta{display:flex;flex-direction:column;gap:10px}
+.meta-row{display:flex;flex-direction:column;gap:10px}
+.kv{display:flex;align-items:center;gap:10px;min-height:40px}
+.kv .k{font-size:12px;color:var(--dim);width:52px;flex-shrink:0}
+.kv .v{flex:1;min-width:0;font:13px/1.4 ui-monospace,Menlo,monospace;
+  background:#0d1117;border:1px solid var(--border);border-radius:8px;
+  padding:9px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg)}
+.kv .v.live{border-color:#23863655}
+
 .btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;
-  gap:8px;width:100%;padding:12px 16px;border-radius:10px;font-weight:650;
-  font-size:14px;border:1px solid transparent;cursor:pointer}
+  gap:8px;padding:11px 14px;border-radius:10px;font-weight:650;font-size:14px;
+  border:1px solid transparent;cursor:pointer;font-family:inherit;color:inherit}
+.btn.block{width:100%}
 .btn.primary{background:var(--acc);color:#04121f}
 .btn.primary:active{transform:translateY(1px)}
-.btn.primary.ok{background:var(--ok)}
+.btn.primary.ok,.btn.ok{background:var(--ok);color:#04120a}
 .btn.ghost{background:var(--panel);color:var(--fg);border-color:var(--border)}
-pre.cmd{margin:0;background:#0d1117;border:1px solid var(--border);border-radius:10px;
-  padding:12px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.btn.ghost:hover{border-color:#484f58}
+.btn:disabled{opacity:.5;cursor:default}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.actions .btn{flex:1;min-width:120px}
 
-details.more{margin-top:8px;border:1px solid var(--border);border-radius:12px;
-  background:var(--panel);overflow:hidden}
-details.more > summary{list-style:none;cursor:pointer;padding:12px 16px;
-  font-weight:600;font-size:14px;color:var(--fg);user-select:none}
-details.more > summary::-webkit-details-marker{display:none}
-details.more > summary::after{content:"Show";float:right;color:var(--dim);font-weight:500;font-size:12px}
-details.more[open] > summary::after{content:"Hide"}
-.agents{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px}
-.agents button{background:#0d1117;color:var(--fg);border:1px solid var(--border);
-  border-radius:999px;padding:7px 12px;font-size:13px;cursor:pointer}
-.agents button.on{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
-.agent-panel{padding:0 16px 16px}
-.agent-panel .toolbar{display:flex;justify-content:flex-end;margin:0 0 8px}
-.copy{background:#21262d;color:var(--fg);border:1px solid var(--border);
-  border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
-.copy.ok{border-color:var(--ok);color:var(--ok)}
+.reveal{background:#0d1117;border:1px solid var(--warn);border-radius:10px;padding:12px;margin:10px 0 0}
+.reveal .tok{font:13px/1.4 ui-monospace,Menlo,monospace;word-break:break-all;margin:0 0 10px}
+.reveal .warn{margin:0 0 8px;font-size:12px}
+
+.installs{display:flex;flex-direction:column;gap:8px}
+.agent-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:420px){.agent-grid{grid-template-columns:1fr}}
+.agent{display:flex;flex-direction:column;gap:8px;background:#0d1117;border:1px solid var(--border);
+  border-radius:10px;padding:12px;text-align:left}
+.agent .name{font-weight:650;font-size:14px}
+.agent .desc{font-size:11px;color:var(--faint);margin:0}
+.agent .btn{width:100%;padding:9px 10px;font-size:13px}
+
+.add-row{display:flex;gap:8px;margin-top:10px}
+.add-row input{flex:1;background:#0d1117;border:1px solid var(--border);color:var(--fg);
+  border-radius:8px;padding:10px 12px;font:inherit;min-width:0}
+.add-row .btn{flex-shrink:0}
+
+pre.cmd{margin:10px 0 0;background:#0d1117;border:1px solid var(--border);border-radius:10px;
+  padding:12px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-size:12px;color:var(--dim)}
 
 @media (max-width:640px){
   .top{padding:0 10px}
@@ -86,200 +97,317 @@ details.more[open] > summary::after{content:"Hide"}
 </header>
 <main class="wrap">
   <h1 class="hero">Connect</h1>
-  <p class="sub" id="status">Paste token. One click.</p>
+  <p class="sub" id="status">Create a token, then install an agent.</p>
 
   <div class="card">
-    <div class="row">
-      <div class="field">
-        <label for="base">URL</label>
-        <input id="base" value="https://bot.getzoro.com" autocomplete="url" spellcheck="false">
+    <div class="meta-row">
+      <div class="kv">
+        <span class="k">URL</span>
+        <span class="v live" id="base-view">https://bot.getzoro.com</span>
       </div>
-      <div class="field">
-        <label for="token">Token</label>
-        <input id="token" type="password" placeholder="Paste" autocomplete="current-password" spellcheck="false">
+      <div class="kv">
+        <span class="k">Token</span>
+        <span class="v" id="token-view">—</span>
       </div>
     </div>
-    <p class="hint" id="token-hint"><a href="/inbox/">Get a token</a></p>
-  </div>
 
-  <div class="card cta">
-    <h2>Cursor</h2>
-    <div class="row" style="margin-bottom:10px">
-      <a class="btn primary" id="deeplink-cursor" href="/inbox/">Install in Cursor</a>
-      <a class="btn ghost" id="deeplink-vscode" href="/inbox/">VS Code</a>
+    <div id="need-token">
+      <div class="actions">
+        <button type="button" class="btn primary" id="btn-create">Create token</button>
+        <button type="button" class="btn ghost" id="btn-paste-toggle">I have one</button>
+      </div>
+      <div id="paste-box" class="hidden" style="margin-top:10px">
+        <label for="paste">Paste token</label>
+        <input id="paste" type="password" placeholder="Paste" autocomplete="current-password"
+          style="width:100%;background:#0d1117;border:1px solid var(--border);color:var(--fg);border-radius:8px;padding:10px 12px;font:inherit;margin-top:4px">
+        <div class="actions">
+          <button type="button" class="btn primary" id="btn-save-paste">Save</button>
+        </div>
+        <p class="hint">Won’t be shown again after save.</p>
+      </div>
     </div>
-    <p class="hint" id="deeplink-hint">Needs a token.</p>
-    <pre class="cmd" id="cursor-cmd">npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent cursor</pre>
-    <button type="button" class="btn primary" id="copy-cursor">Copy</button>
+
+    <div id="have-token" class="hidden">
+      <div class="actions">
+        <button type="button" class="btn ghost" id="btn-new-token">New token</button>
+        <button type="button" class="btn ghost" id="btn-clear">Clear</button>
+      </div>
+      <p class="hint">Saved in this browser. Create new if you lost it.</p>
+    </div>
+
+    <div id="once" class="reveal hidden">
+      <p class="warn">Copy now — shown once.</p>
+      <div class="tok" id="once-tok"></div>
+      <div class="actions">
+        <button type="button" class="btn primary" id="btn-copy-tok">Copy</button>
+        <button type="button" class="btn ghost" id="btn-dismiss">Saved</button>
+      </div>
+    </div>
   </div>
 
-  <details class="more" id="more">
-    <summary>Other agents</summary>
-    <div class="agents" id="tabs" role="tablist"></div>
-    <div class="agent-panel" id="panel"></div>
-  </details>
+  <div class="card" id="install-card">
+    <h2>Install</h2>
+    <div class="installs">
+      <a class="btn primary block" id="deeplink-cursor" href="#">Cursor</a>
+      <a class="btn ghost block" id="deeplink-vscode" href="#">VS Code</a>
+      <button type="button" class="btn ghost block" id="copy-cursor">Copy Cursor command</button>
+    </div>
+    <pre class="cmd" id="cursor-cmd"></pre>
+    <p class="hint" id="install-hint">Needs a token.</p>
+  </div>
+
+  <div class="card">
+    <h2>Agents</h2>
+    <p class="hint" style="margin:0 0 10px">One-click copy for each.</p>
+    <div class="agent-grid" id="agent-grid"></div>
+    <div class="add-row">
+      <input id="custom-agent" placeholder="Custom name" maxlength="32" autocomplete="off">
+      <button type="button" class="btn ghost" id="btn-add-agent">Add</button>
+    </div>
+    <pre class="cmd hidden" id="custom-cmd"></pre>
+  </div>
 </main>
 <script>
 const $ = id => document.getElementById(id);
-const qs = new URLSearchParams(location.search);
-const DEFAULT_BASE = (location.origin.includes('localhost') || location.origin.includes('127.0.0.1'))
+const KEY = 'am_token';
+const SEEN = 'am_token_seen';
+
+// Fixed brain URL — never editable (avoids broken values like "mazin").
+const BASE = (location.origin.includes('localhost') || location.origin.includes('127.0.0.1'))
   ? location.origin : 'https://bot.getzoro.com';
 
-$('base').value = qs.get('url') || localStorage.getItem('am_base') || DEFAULT_BASE;
-$('token').value = qs.get('token') || localStorage.getItem('am_token') || '';
+let RAW = localStorage.getItem(KEY) || '';
+let FRESH = ''; // view-once plaintext while the reveal is open
 
-function base() {
-  return ($('base').value || DEFAULT_BASE).replace(/\/+$/, '').replace(/\/mcp$/, '');
+$('base-view').textContent = BASE;
+
+function hasToken(){ return !!(RAW || FRESH); }
+function tok(){ return (FRESH || RAW || '').trim(); }
+function mcpUrl(){ return BASE + '/mcp'; }
+function redactedCmd(){
+  return `npx --yes agent-manager-brain connect --url ${BASE} --token •••••••• --agent cursor`;
 }
-function token() { return ($('token').value || '').trim(); }
-function mcpUrl() { return base() + '/mcp'; }
-function tokFlag() { return token() ? ` --token ${token()}` : ' --token YOUR_TOKEN'; }
+function realCmd(agent){
+  const t = tok() || 'YOUR_TOKEN';
+  return `npx --yes agent-manager-brain connect --url ${BASE} --token ${t} --agent ${agent}`;
+}
 
-function mcpJson(style='generic') {
-  const t = token();
-  if (style === 'vscode') {
-    return JSON.stringify({
-      servers: { 'agent-manager': {
-        type: 'http', url: mcpUrl(),
-        ...(t ? { headers: { 'X-Token': t } } : {}),
-      }},
-    }, null, 2);
+function b64(s){ return btoa(unescape(encodeURIComponent(s))); }
+function deeplink(kind){
+  const t = tok();
+  if(!t) return null;
+  const cfg = { url: mcpUrl(), headers: { 'X-Token': t } };
+  if(kind === 'vscode'){
+    cfg.type = 'http';
+    return 'vscode:mcp/install?name=' + encodeURIComponent('zoro')
+      + '&config=' + encodeURIComponent(JSON.stringify(cfg));
   }
-  if (style === 'continue') {
-    return ['mcpServers:', '  - name: agent-manager', `    url: ${mcpUrl()}`,
-      ...(t ? ['    headers:', `      X-Token: ${t}`] : [])].join('\n');
-  }
-  if (style === 'zed') {
-    return JSON.stringify({
-      context_servers: { 'agent-manager': {
-        url: mcpUrl(), ...(t ? { headers: { 'X-Token': t } } : {}),
-      }},
-    }, null, 2);
-  }
-  return JSON.stringify({
-    mcpServers: { 'agent-manager': {
-      url: mcpUrl(), ...(t ? { headers: { 'X-Token': t } } : {}),
-    }},
-  }, null, 2);
-}
-
-function cursorCmd() {
-  return `npx --yes agent-manager-brain connect --url ${base()}${tokFlag()} --agent cursor`;
-}
-
-function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
-function deeplinkConfig() {
-  const t = token();
-  if (!t) return null;
-  return { url: mcpUrl(), headers: { 'X-Token': t } };
-}
-function cursorDeeplink() {
-  const cfg = deeplinkConfig();
-  if (!cfg) return null;
   return 'cursor://anysphere.cursor-deeplink/mcp/install?name='
-    + encodeURIComponent('agent-manager')
+    + encodeURIComponent('zoro')
     + '&config=' + encodeURIComponent(b64(JSON.stringify(cfg)));
 }
-function vscodeDeeplink() {
-  const cfg = deeplinkConfig();
-  if (!cfg) return null;
-  cfg.type = 'http';
-  return 'vscode:mcp/install?name='
-    + encodeURIComponent('agent-manager')
-    + '&config=' + encodeURIComponent(JSON.stringify(cfg));
+
+function mcpJson(style, name){
+  const t = tok();
+  const n = name || 'zoro';
+  if(style === 'vscode'){
+    return JSON.stringify({ servers: { [n]: {
+      type:'http', url: mcpUrl(),
+      ...(t ? { headers: { 'X-Token': t } } : {}),
+    }}}, null, 2);
+  }
+  if(style === 'continue'){
+    return ['mcpServers:', `  - name: ${n}`, `    url: ${mcpUrl()}`,
+      ...(t ? ['    headers:', `      X-Token: ${t}`] : [])].join('\n');
+  }
+  if(style === 'zed'){
+    return JSON.stringify({ context_servers: { [n]: {
+      url: mcpUrl(), ...(t ? { headers: { 'X-Token': t } } : {}),
+    }}}, null, 2);
+  }
+  if(style === 'claude'){
+    const h = t ? ` \\\n  --header "X-Token: ${t}"` : '';
+    return `claude mcp add --transport http ${n} ${mcpUrl()}${h}`;
+  }
+  return JSON.stringify({ mcpServers: { [n]: {
+    url: mcpUrl(), ...(t ? { headers: { 'X-Token': t } } : {}),
+  }}}, null, 2);
 }
 
-const PLATFORMS = [
-  { id:'claude', label:'Claude', title:'Claude Code',
-    code(){ const h = token() ? ` \\\n  --header "X-Token: ${token()}"` : '';
-      return `claude mcp add --transport http agent-manager ${mcpUrl()}${h}`; }},
-  { id:'vscode', label:'VS Code', title:'VS Code', code:()=>mcpJson('vscode') },
-  { id:'windsurf', label:'Windsurf', title:'Windsurf', code:()=>mcpJson('generic') },
-  { id:'cline', label:'Cline', title:'Cline', code:()=>mcpJson('generic') },
-  { id:'continue', label:'Continue', title:'Continue', code:()=>mcpJson('continue') },
-  { id:'zed', label:'Zed', title:'Zed', code:()=>mcpJson('zed') },
-  { id:'npx', label:'npm', title:'npm',
-    code(){ return `npx --yes agent-manager-brain connect --url ${base()}${tokFlag()} --agent vscode`; }},
-  { id:'selfhost', label:'Self-host', title:'Self-host',
-    code(){ return [
-      `npx --yes agent-manager-brain init`,
-      `npx --yes agent-manager-brain serve`,
-      `npx --yes agent-manager-brain connect --url http://127.0.0.1:8075${tokFlag()} --agent generic`,
-    ].join('\n'); }},
-  { id:'generic', label:'JSON', title:'MCP JSON', code:()=>mcpJson('generic') },
-  { id:'curl', label:'curl', title:'curl',
-    code(){ const t=token()||'YOUR_TOKEN';
-      return `curl -s "${base()}/api/search?q=test" -H "X-Token: ${t}"`; }},
+const AGENTS = [
+  { id:'claude', label:'Claude', desc:'Claude Code', style:'claude' },
+  { id:'vscode', label:'VS Code', desc:'Copilot MCP', style:'vscode' },
+  { id:'windsurf', label:'Windsurf', desc:'MCP JSON', style:'generic' },
+  { id:'cline', label:'Cline', desc:'MCP JSON', style:'generic' },
+  { id:'continue', label:'Continue', desc:'YAML', style:'continue' },
+  { id:'zed', label:'Zed', desc:'context_servers', style:'zed' },
+  { id:'npm', label:'npm', desc:'any agent', style:'npm' },
+  { id:'json', label:'JSON', desc:'generic MCP', style:'generic' },
 ];
 
-let ACTIVE = qs.get('agent') || 'claude';
-if (ACTIVE === 'cursor') ACTIVE = 'claude';
-
-function persist() {
-  localStorage.setItem('am_base', base());
-  if (token()) localStorage.setItem('am_token', token());
-  const has = !!token();
-  $('status').textContent = has ? 'Ready.' : 'Paste token. One click.';
-  $('token-hint').innerHTML = has
-    ? '<span class="okmsg">Ready.</span>'
-    : '<a href="/inbox/">Get a token</a>';
-  $('cursor-cmd').textContent = cursorCmd();
-  const cl = cursorDeeplink(), vl = vscodeDeeplink();
-  $('deeplink-cursor').href = cl || '/inbox/';
-  $('deeplink-vscode').href = vl || '/inbox/';
-  $('deeplink-hint').textContent = cl ? 'Opens Cursor / VS Code.' : 'Needs a token.';
+function agentCode(a){
+  if(a.style === 'npm') return realCmd(a.id === 'npm' ? 'vscode' : a.id);
+  return mcpJson(a.style, a.id === 'json' ? 'zoro' : a.id);
 }
 
-async function copyText(text, btn, okLabel) {
-  try {
+async function copyText(text, btn){
+  try{
     await navigator.clipboard.writeText(text);
     const old = btn.textContent;
-    btn.textContent = okLabel || 'Copied';
+    btn.textContent = 'Copied';
     btn.classList.add('ok');
     setTimeout(() => { btn.textContent = old; btn.classList.remove('ok'); }, 1200);
-  } catch {
-    const r = document.createRange();
-    r.selectNodeContents($('cursor-cmd'));
-    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-    btn.textContent = 'Select';
+  }catch{ alert('Copy failed'); }
+}
+
+function renderAgents(){
+  $('agent-grid').innerHTML = AGENTS.map(a =>
+    `<div class="agent" data-id="${a.id}">
+      <div class="name">${a.label}</div>
+      <p class="desc">${a.desc}</p>
+      <button type="button" class="btn ghost copy-agent">Copy</button>
+    </div>`
+  ).join('');
+  $('agent-grid').querySelectorAll('.agent').forEach(el => {
+    const a = AGENTS.find(x => x.id === el.dataset.id);
+    el.querySelector('.copy-agent').onclick = ev => {
+      if(!tok()){ alert('Create a token first'); return; }
+      copyText(agentCode(a), ev.currentTarget);
+    };
+  });
+}
+
+function paint(){
+  const seen = localStorage.getItem(SEEN) === '1';
+  const showingOnce = !$('once').classList.contains('hidden') && !!FRESH;
+
+  if(showingOnce){
+    $('token-view').textContent = FRESH;
+    $('token-view').classList.add('live');
+    $('need-token').classList.add('hidden');
+    $('have-token').classList.add('hidden');
+  } else if(hasToken() && seen){
+    $('token-view').textContent = '••••••••••••';
+    $('token-view').classList.add('live');
+    $('need-token').classList.add('hidden');
+    $('have-token').classList.remove('hidden');
+  } else {
+    $('token-view').textContent = 'none';
+    $('token-view').classList.remove('live');
+    $('need-token').classList.remove('hidden');
+    $('have-token').classList.add('hidden');
+  }
+
+  $('status').textContent = hasToken()
+    ? (showingOnce ? 'Copy the token, then install.' : 'Install an agent.')
+    : 'Create a token, then install an agent.';
+
+  // Commands always redact on screen; copy / deeplinks use real token.
+  $('cursor-cmd').textContent = redactedCmd();
+  $('deeplink-cursor').href = deeplink('cursor') || '#';
+  $('deeplink-vscode').href = deeplink('vscode') || '#';
+  $('install-hint').textContent = tok()
+    ? 'Links include the token. Not shown here again.'
+    : 'Needs a token.';
+  $('copy-cursor').disabled = !tok();
+}
+
+async function createToken(){
+  $('btn-create').disabled = true;
+  try{
+    const s = await fetch('/api/setup/status').then(r => r.json());
+    const path = s.bootstrap ? '/api/setup/bootstrap' : '/api/setup/signup';
+    if(!s.bootstrap && !s.signup_open){
+      alert('Signup closed. Paste a token instead.');
+      return;
+    }
+    const r = await fetch(path, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ label: 'connect' }),
+    });
+    const d = await r.json();
+    if(!r.ok){ alert(d.error || 'failed'); return; }
+    FRESH = d.token;
+    RAW = d.token;
+    localStorage.setItem(KEY, RAW);
+    localStorage.removeItem(SEEN);
+    $('once-tok').textContent = FRESH;
+    $('once').classList.remove('hidden');
+    $('paste-box').classList.add('hidden');
+    paint();
+  } finally {
+    $('btn-create').disabled = false;
   }
 }
 
-function renderMore() {
-  $('tabs').innerHTML = PLATFORMS.map(p =>
-    `<button type="button" data-id="${p.id}" class="${p.id===ACTIVE?'on':''}">${p.label}</button>`
-  ).join('');
-  const p = PLATFORMS.find(x => x.id === ACTIVE) || PLATFORMS[0];
-  const code = p.code();
-  $('panel').innerHTML = `
-    <h2 style="margin:0 0 8px;font-size:14px">${p.title}</h2>
-    <div class="toolbar"><button class="copy" type="button">Copy</button></div>
-    <pre class="cmd" id="snippet"></pre>`;
-  $('snippet').textContent = code;
-  $('panel').querySelector('.copy').onclick = ev => copyText(code, ev.currentTarget, 'Copied');
+function dismissOnce(){
+  if(!FRESH) return;
+  localStorage.setItem(SEEN, '1');
+  FRESH = '';
+  $('once').classList.add('hidden');
+  $('once-tok').textContent = '';
+  paint();
 }
 
-function render() {
-  persist();
-  renderMore();
+function savePaste(){
+  const t = $('paste').value.trim();
+  if(!t) return;
+  RAW = t;
+  localStorage.setItem(KEY, RAW);
+  localStorage.setItem(SEEN, '1'); // pasted = already seen
+  FRESH = '';
+  $('paste').value = '';
+  $('paste-box').classList.add('hidden');
+  $('once').classList.add('hidden');
+  paint();
 }
 
-$('copy-cursor').onclick = ev => copyText(cursorCmd(), ev.currentTarget, 'Copied');
-$('tabs').onclick = e => {
-  const b = e.target.closest('button[data-id]');
-  if (!b) return;
-  ACTIVE = b.dataset.id;
-  renderMore();
+$('btn-create').onclick = createToken;
+$('btn-paste-toggle').onclick = () => {
+  $('paste-box').classList.toggle('hidden');
 };
-$('base').addEventListener('input', render);
-$('token').addEventListener('input', render);
+$('btn-save-paste').onclick = savePaste;
+$('btn-copy-tok').onclick = ev => copyText(FRESH || RAW, ev.currentTarget);
+$('btn-dismiss').onclick = dismissOnce;
+$('btn-clear').onclick = () => {
+  if(!confirm('Clear token from this browser?')) return;
+  RAW = ''; FRESH = '';
+  localStorage.removeItem(KEY);
+  localStorage.removeItem(SEEN);
+  paint();
+};
+$('btn-new-token').onclick = () => {
+  if(!confirm('Create a new token? The old one stays valid until revoked.')) return;
+  localStorage.removeItem(SEEN);
+  createToken();
+};
+$('copy-cursor').onclick = ev => {
+  if(!tok()){ alert('Create a token first'); return; }
+  copyText(realCmd('cursor'), ev.currentTarget);
+};
+$('deeplink-cursor').addEventListener('click', e => {
+  if(!deeplink('cursor')){ e.preventDefault(); alert('Create a token first'); }
+});
+$('deeplink-vscode').addEventListener('click', e => {
+  if(!deeplink('vscode')){ e.preventDefault(); alert('Create a token first'); }
+});
+$('btn-add-agent').onclick = ev => {
+  const name = ($('custom-agent').value || '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g,'-').slice(0,32);
+  if(!name){ alert('Name required'); return; }
+  if(!tok()){ alert('Create a token first'); return; }
+  const code = mcpJson('generic', name);
+  $('custom-cmd').textContent = code.replace(tok(), '••••••••');
+  $('custom-cmd').classList.remove('hidden');
+  copyText(code, ev.currentTarget);
+};
 
-if (qs.get('agent') && qs.get('agent') !== 'cursor') {
-  $('more').open = true;
-  ACTIVE = qs.get('agent');
+// If we already have a token from Inbox and never marked seen, treat as saved (don't re-reveal).
+if(RAW && localStorage.getItem(SEEN) !== '1'){
+  localStorage.setItem(SEEN, '1');
 }
 
-render();
+renderAgents();
+paint();
 </script>
 </body>
 </html>
