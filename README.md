@@ -21,6 +21,8 @@ Self-hosted. Stdlib-only Python. One process.
 
 ## First-time setup
 
+**Self-hosting? Jump to [AGENT-SETUP.md](AGENT-SETUP.md) — one command.**
+
 1. Open **[/setup/](https://bot.getzoro.com/setup/)** → get a free token  
 2. Open **[/connect/](https://bot.getzoro.com/connect/)** → pick your agent → Copy  
 

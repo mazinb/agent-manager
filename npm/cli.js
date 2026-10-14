@@ -181,6 +181,83 @@ function serveCmd(args) {
   child.on("exit", code => process.exit(code || 0));
 }
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function waitFor(url, token, timeoutMs) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    try {
+      const res = await fetch(url, { headers: token ? { "X-Token": token } : {} });
+      if (res.ok) return true;
+    } catch {}
+    await sleep(500);
+  }
+  return false;
+}
+
+async function setupCmd(args) {
+  const dir = path.resolve(args.dir || DEFAULT_HOME);
+  const port = String(args.port || 8075);
+  const base = `http://127.0.0.1:${port}`;
+  ensureRepo(dir);
+  const envPath = ensureEnv(dir, args.token);
+  ensureConfig();
+  const tok = fs.readFileSync(envPath, "utf8")
+    .match(/AGENT_MANAGER_TOKEN=(.+)/)?.[1]?.trim() || "";
+  const py = process.env.PYTHON || "python3";
+  if (spawnSync(py, ["--version"], { encoding: "utf8" }).status !== 0) {
+    console.error("python3 is required (3.9+). Install it and re-run setup.");
+    process.exit(1);
+  }
+
+  let running = await waitFor(base + "/api/setup/status", tok, 1500);
+  if (!running) {
+    const homeDir = path.dirname(dir);
+    const logPath = path.join(homeDir, "agent-manager.log");
+    const pidPath = path.join(homeDir, "agent-manager.pid");
+    const logFd = fs.openSync(logPath, "a");
+    const child = spawn(py, ["server.py"], {
+      cwd: dir, detached: true, stdio: ["ignore", logFd, logFd],
+      env: { ...process.env, AGENT_MANAGER_PORT: port },
+    });
+    child.unref();
+    fs.writeFileSync(pidPath, String(child.pid));
+    console.log(`server starting (pid ${child.pid}, log ${logPath})`);
+    running = await waitFor(base + "/api/setup/status", tok, 20000);
+    if (!running) {
+      console.error(`server did not come up on :${port} — check ${logPath}`);
+      process.exit(1);
+    }
+  } else {
+    console.log(`server already running on :${port}`);
+  }
+
+  process.stdout.write("ingesting sources… ");
+  try {
+    const r = await api(base, tok, "POST", "/api/refresh");
+    console.log(`done (${r.sources ?? "?"} sources)`);
+  } catch (e) { console.log(`skipped (${e.message})`); }
+
+  if (args.agent) {
+    connect({ ...args, url: base, token: tok });
+  } else {
+    console.log(`\nConnect your agent:\n  npx agent-manager-brain connect --url ${base} --token ${tok} --agent cursor\n`);
+  }
+  console.log(`UI:  ${base}/`);
+  console.log(`MCP: ${base}/mcp   (X-Token: value in ${envPath})`);
+  console.log(`Stop: npx agent-manager-brain stop`);
+}
+
+function stopCmd(args) {
+  const dir = path.resolve(args.dir || DEFAULT_HOME);
+  const pidPath = path.join(path.dirname(dir), "agent-manager.pid");
+  if (!fs.existsSync(pidPath)) { console.log("no pidfile — not running via setup"); return; }
+  const pid = parseInt(fs.readFileSync(pidPath, "utf8").trim(), 10);
+  try { process.kill(pid); console.log(`stopped pid ${pid}`); }
+  catch (e) { console.log(`could not stop ${pid}: ${e.message}`); }
+  fs.unlinkSync(pidPath);
+}
+
 function connect(args) {
   const base = requireBase(args);
   const url = base + "/mcp";
@@ -294,6 +371,8 @@ async function main() {
     if (cmd === "connect") return connect(args);
     if (cmd === "init") return initCmd(args);
     if (cmd === "serve") return serveCmd(args);
+    if (cmd === "setup") return await setupCmd(args);
+    if (cmd === "stop") return stopCmd(args);
     if (cmd === "help") { console.log(__doc); return; }
     const base = requireBase(args);
     const token = args.token || TOKEN;
@@ -332,11 +411,18 @@ const __doc = `agent-manager-brain — shared brain for any coding agent
   connect  --url https://host --token TOK --agent <platform>
            platforms: cursor claude vscode copilot windsurf cline
                       continue zed codex gemini generic
+  setup    [--agent X] [--port 8075] [--dir DIR] [--token TOK]
+           ONE COMMAND self-host: clone + config + start server
+           (background) + ingest + connect an agent
+  stop     [--dir DIR]                    stop a setup-started server
   init     [--dir ~/.agent-manager/app]   clone + write .env/config
   serve    [--dir DIR] [--port 8075]      run local brain (needs python3)
   ask|search|pack|note|stats              query a running brain
 
-Self-host (all via npm):
+Self-host (one command):
+  npx agent-manager-brain setup --agent cursor
+
+Self-host (manual):
   npx agent-manager-brain init
   npx agent-manager-brain serve
   npx agent-manager-brain connect --url http://127.0.0.1:8075 --token TOK --agent cursor

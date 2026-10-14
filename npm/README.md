@@ -22,6 +22,12 @@ One-click UI: https://bot.getzoro.com/connect/
 The HTTP/MCP server is Python (stdlib only). npm clones and runs it:
 
 ```bash
+npx agent-manager-brain setup --agent cursor   # one command, see ../AGENT-SETUP.md
+```
+
+Or step by step:
+
+```bash
 npx agent-manager-brain init          # clone + .env + config
 npx agent-manager-brain serve         # http://127.0.0.1:8075
 npx agent-manager-brain connect \
