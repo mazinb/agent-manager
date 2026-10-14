@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-manager"
-version = "0.3.0"
-description = "Cursor plugin + dashboard + shared brain for agents. Self-hosted, stdlib-only Python, MCP over HTTP."
+version = "0.3.1"
+description = "Shared brain for coding agents. Self-hosted, stdlib-only Python, MCP + REST."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }

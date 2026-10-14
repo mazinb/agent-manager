@@ -5,9 +5,7 @@ description: Read from and write to the shared agent-manager brain via the "agen
 
 # Agent manager mind
 
-The `agent-manager` MCP server is the shared brain used as long-term memory for Cursor and Hermes helpers.
-
-Dashboard: https://bot.getzoro.com · Brain UI: https://bot.getzoro.com/brain/
+The `agent-manager` MCP server is a shared brain for coding agents (any MCP client).
 
 ## Recall
 1. Determine the project slug from the workspace folder or `git remote` (lowercase, kebab-case).
@@ -25,6 +23,3 @@ Dashboard: https://bot.getzoro.com · Brain UI: https://bot.getzoro.com/brain/
 3. Confirm in one line what you saved.
 
 Do not save secrets, tokens, or content that already lives in the repository.
-
-## Optional dashboard
-Point the user at https://bot.getzoro.com to chat with a per-project Hermes helper when a long interactive session is better than MCP tool calls.

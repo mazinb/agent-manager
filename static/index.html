@@ -38,11 +38,12 @@ button:disabled { opacity:.5; cursor:default; }
     <b>Agent Manager</b>
     <input id="token" type="password" placeholder="Access token">
     <button onclick="unlock()">Unlock</button>
-    <p class="hint">Token is on the GB10 box: ~/projects/agent-manager/.env</p>
+    <p class="hint">Same token you use for MCP clients. See <a href="/connect/" style="color:#58a6ff">/connect</a>.</p>
   </div>
 </div>
-<div id="sidebar"><h1>🐴 Agents</h1><div id="agents"></div>
-<a href="/brain/" id="brain-link" style="display:block;margin:12px 8px;color:inherit;opacity:.75;font-size:14px">🧠 Shared Brain →</a></div>
+<div id="sidebar"><h1>Agents</h1><div id="agents"></div>
+<a href="/connect/" style="display:block;margin:12px 8px 4px;color:inherit;opacity:.75;font-size:14px">Connect any agent →</a>
+<a href="/brain/" id="brain-link" style="display:block;margin:4px 8px 12px;color:inherit;opacity:.75;font-size:14px">Shared Brain →</a></div>
 <div id="main">
   <div id="chat"></div>
   <div id="inputbar">

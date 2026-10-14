@@ -1,12 +1,12 @@
 {
   "name": "agent-manager",
-  "version": "0.3.0",
-  "description": "Shared brain for Cursor: recall project context, save decisions, and chat with per-project Hermes helpers at bot.getzoro.com.",
+  "version": "0.3.1",
+  "description": "Shared brain for coding agents — recall project context and save decisions over MCP.",
   "author": {
     "name": "mazinb",
     "email": "mazin@getzoro.com"
   },
-  "homepage": "https://bot.getzoro.com",
+  "homepage": "https://bot.getzoro.com/connect/",
   "repository": "https://github.com/mazinb/agent-manager",
   "license": "MIT",
   "logo": "assets/logo.svg",
@@ -15,9 +15,7 @@
     "knowledge",
     "context",
     "mcp",
-    "agents",
-    "hermes",
-    "getzoro"
+    "agents"
   ],
   "rules": "./rules",
   "skills": "./skills",
@@ -35,7 +33,7 @@
       "AGENT_MANAGER_TOKEN": {
         "type": "string",
         "title": "Access token",
-        "description": "X-Token that unlocks bot.getzoro.com (same token as the dashboard)."
+        "description": "X-Token for the brain (same token as the dashboard /connect page)."
       }
     },
     "required": ["AGENT_MANAGER_URL", "AGENT_MANAGER_TOKEN"]

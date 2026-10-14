@@ -25,7 +25,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from agent_context import llm, mcp, pipeline, query, store  # noqa: E402
+from agent_context import llm, mcp, query, store  # noqa: E402
 from agent_context.server import Brain  # noqa: E402
 
 STATIC = os.path.join(ROOT, "static")
@@ -195,6 +195,9 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             return self._file(os.path.join(STATIC, "index.html"),
                               "text/html; charset=utf-8")
+        if path in ("/connect", "/connect/"):
+            return self._file(os.path.join(STATIC, "connect.html"),
+                              "text/html; charset=utf-8")
         if path in ("/brain", "/brain/"):
             return self._file(os.path.join(BRAIN_STATIC, "index.html"),
                               "text/html; charset=utf-8")
@@ -203,7 +206,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/mcp":
             return self._json(200, {
                 "server": "agent-manager",
-                "version": "0.3.0",
+                "version": "0.3.1",
                 "transport": "streamable-http (POST JSON-RPC to /mcp)",
                 "tools": [t["name"] for t in mcp.TOOLS],
             })

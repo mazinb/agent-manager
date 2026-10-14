@@ -1,11 +1,11 @@
 ---
-description: Use the agent-manager shared brain (MCP server "agent-manager") as long-term memory across sessions instead of Adapter or ad-hoc notes.
+description: Use the agent-manager shared brain (MCP server "agent-manager") as long-term memory across sessions instead of inventing local notes.
 alwaysApply: true
 ---
 
-The `agent-manager` MCP server is this workspace's shared brain. Prefer it over Adapter or inventing local memory.
+The `agent-manager` MCP server is this workspace's shared brain. Prefer it over inventing ad-hoc memory.
 
-Dashboard: https://bot.getzoro.com — Hermes helpers + brain UI at https://bot.getzoro.com/brain/
+Setup UI: `{brain}/connect/` · Brain UI: `{brain}/brain/` · MCP: `{brain}/mcp`
 
 ## Recall
 Before acting on something that may have prior context (a past decision, convention, or earlier problem), query the brain instead of guessing:
@@ -22,10 +22,7 @@ Query when it is relevant, not on every message. An empty brain is normal for a 
 At the end of a unit of work, save what should outlive the session with `note`:
 
 - Set `project` to a stable lowercase slug for the repo or agent (e.g. `voice-tutor`, `agent-manager`).
-- `title`: short and specific (`decision: auth via github`, `outcome: marketplace plugin scaffold`).
+- `title`: short and specific (`decision: auth via github`, `outcome: connect page shipped`).
 - `body`: Markdown — for a decision include context, choice, reasoning, and rejected alternatives; for a task outcome include what changed, where, and how it was verified.
 
 Do not save secrets, tokens, `.env` contents, transient chat, or file contents that already live in the repository.
-
-## Conflict
-If both Adapter and agent-manager are installed, prefer agent-manager for recall/remember on this workspace.

@@ -1,23 +1,47 @@
 # Agent manager
 
-One product for Cursor agents and Hermes helpers:
+A **shared brain for coding agents** — any platform that speaks MCP or HTTP.
 
-- **Shared brain** — ingest project docs, rules, memories, and services into SQLite + FTS5; answer with citations over MCP
-- **Dashboard** — chat with per-project Hermes helpers at **[bot.getzoro.com](https://bot.getzoro.com)**
-- **Cursor plugin** — always-on recall/remember rules + MCP wiring for the marketplace
+Ingest project docs, rules, memories, and live services into a local knowledge
+graph. Agents can **search**, **ask** (cited answers), pull **context packs**,
+and **save notes** so the next session starts with memory.
 
-Self-hosted, stdlib-only Python. No separate `agent-context` service and no public `/space`.
+Self-hosted. Stdlib-only Python. One process.
 
-## Install (Cursor Marketplace)
+**Live demo / host UI:** [bot.getzoro.com](https://bot.getzoro.com)
 
-1. Install **agent-manager** from the Cursor plugin marketplace (or Team Marketplace).
-2. **Plugins → Configure**:
-   - **MCP URL** — `https://bot.getzoro.com/mcp` (or your self-hosted URL)
-   - **Access token** — same token that unlocks the dashboard
-3. Disable **Adapter** if it is also installed.
-4. In Agent chat use `/recall` and `/remember`, or let the always-on rule call the tools.
+| Path | Purpose |
+|---|---|
+| [`/connect/`](https://bot.getzoro.com/connect/) | One-click copy setup for every major agent |
+| `/` | Optional helper chat UI |
+| `/brain/` | Ask / entities / context packs |
+| `/mcp` | Streamable HTTP MCP |
+| `/api/*` | JSON API |
 
-### Manual MCP
+## Connect in 30 seconds
+
+Open **[/connect/](https://bot.getzoro.com/connect/)**, paste your access token,
+pick your agent, hit **Copy**.
+
+Or run a one-liner:
+
+```bash
+# Cursor
+npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent cursor
+
+# Claude Code
+npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent claude
+
+# VS Code / Copilot, Windsurf, Cline, Continue, Zed, …
+npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent vscode
+```
+
+Supported `--agent` values: `cursor`, `claude`, `vscode`, `copilot`, `windsurf`,
+`cline`, `continue`, `zed`, `codex`, `gemini`, `generic`.
+
+Full step-by-step for each platform: **[docs/CONNECT.md](docs/CONNECT.md)**.
+
+### Generic MCP JSON
 
 ```json
 {
@@ -30,6 +54,9 @@ Self-hosted, stdlib-only Python. No separate `agent-context` service and no publ
 }
 ```
 
+Auth: `X-Token` or `Authorization: Bearer`.  
+Tools: `ask`, `search`, `entity`, `context_pack`, `projects`, `stats`, `note`.
+
 ## Self-host
 
 ```bash
@@ -39,49 +66,40 @@ cp config.example.json ~/.config/agent-manager/config.json
 # edit sources / llm as needed
 
 pip install -e .
-bash install.sh                      # Hermes helper profiles from staging/
 agent-manager refresh                # ingest
 agent-manager serve                  # http://127.0.0.1:8075
 ```
 
-| Path | Purpose |
-|---|---|
-| `/` | Hermes helper chat |
-| `/brain/` | Brain UI (ask / entities / packs) |
-| `/mcp` | Streamable HTTP MCP |
-| `/api/*` | Chat + brain JSON API |
+Then open `http://127.0.0.1:8075/connect/` and point agents at
+`http://127.0.0.1:8075/mcp`.
 
-Auth is one token: `AGENT_MANAGER_TOKEN` in `.env` (`X-Token` or `Bearer`).
+Optional: `bash install.sh` installs local helper chat profiles from `staging/`
+if you use that workflow.
 
-### systemd (this host)
-
-```bash
-systemctl --user restart agent-manager.service
-systemctl --user disable --now agent-context.service agent-context-public.service
-```
-
-Daily re-ingest: `agent-manager-refresh.timer` → `agent-manager refresh`.
-
-## Plugin layout
+## How the brain works
 
 ```
-.cursor-plugin/plugin.json   Cursor Plugin manifest + variables
-mcp.json                     MCP → https://bot.getzoro.com/mcp
-rules/agent-manager.mdc      always-on recall / remember
-skills/agent-manager/        procedures
-commands/                    /recall, /remember
-assets/logo.svg
+ingest ──▶ resolve ──▶ query
+files     entities    search / ask
+memories  graph       context packs
+services              notes (agent → agent)
+```
+
+- **SQLite + FTS5** — one file, WAL
+- **Local LLM optional** — any OpenAI-compatible endpoint for cited answers
+- **MCP + REST** — same auth, same tools
+
+## Layout
+
+```
+static/connect.html          one-click setup UI
+static/index.html            helper chat UI
 agent_context/               brain library (ingest / query / MCP)
 server.py                    unified HTTP process
-staging/ + install.sh        Hermes helper packs
+docs/CONNECT.md              per-platform instructions
+npm/                         npx agent-manager-brain CLI
+config.example.json          brain sources / llm
 ```
-
-MCP tools: `ask`, `search`, `entity`, `context_pack`, `projects`, `stats`, `note`.
-
-## Marketplace submission
-
-See [docs/MARKETPLACE.md](docs/MARKETPLACE.md). Submit at
-[cursor.com/marketplace/publish](https://cursor.com/marketplace/publish).
 
 ## License
 
