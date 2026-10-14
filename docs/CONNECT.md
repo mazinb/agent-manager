@@ -9,7 +9,17 @@ MCP endpoint: `{BASE}/mcp`
 Auth header: `X-Token: YOUR_TOKEN` (or `Authorization: Bearer YOUR_TOKEN`)
 
 1. Get a token at **`{BASE}/setup/`** (create on first run, or paste one you have)  
-2. Open **`{BASE}/connect/`**, paste the token, pick a platform, **Copy**
+2. Open **`{BASE}/connect/`**, paste the token, tap **Copy Cursor command**
+
+`/connect/` is a self-contained static page (no API, CSS inlined). The origin
+sends `Cache-Control: public, s-maxage=86400` so Cloudflare can serve it from
+the edge. Free Cloudflare plans still skip HTML unless you add a Cache Rule:
+
+- If: hostname equals `bot.getzoro.com` AND URI Path starts with `/connect`
+- Then: Cache eligibility = Eligible for cache, Edge TTL = 1 day
+
+Without that rule the page is still one round-trip (no CSS hop) but the first
+hit still goes through the Spark tunnel.
 
 ---
 

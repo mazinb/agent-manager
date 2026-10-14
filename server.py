@@ -203,9 +203,19 @@ class Handler(BaseHTTPRequestHandler):
         if not os.path.isfile(path):
             return self._json(404, {"error": "not found"})
         body = open(path, "rb").read()
+        etag = '"' + hashlib.sha256(body).hexdigest()[:16] + '"'
+        inm = (self.headers.get("If-None-Match") or "").strip()
+        if inm == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            if cache:
+                self.send_header("Cache-Control", cache)
+            self.end_headers()
+            return
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("ETag", etag)
         if cache:
             self.send_header("Cache-Control", cache)
         self.end_headers()
