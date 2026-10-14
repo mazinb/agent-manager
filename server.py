@@ -293,7 +293,9 @@ class Handler(BaseHTTPRequestHandler):
                 "message": "Public /space was removed. Use /mcp with a token.",
             })
 
-        # Public UIs
+        # Public UIs + shared assets
+        if path == "/static/app.css":
+            return self._file(os.path.join(STATIC, "app.css"), "text/css")
         if path in ("/", "/index.html", "/home"):
             return self._file(os.path.join(STATIC, "home.html"),
                               "text/html; charset=utf-8")

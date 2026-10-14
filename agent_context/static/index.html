@@ -12,17 +12,17 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);
   font:15px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif}
-header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
-  padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;
-  background:#0d1117f2;backdrop-filter:blur(8px);z-index:5}
-header h1{font-size:17px;margin:0}
-header .sub{color:var(--dim);font-size:12px}
-header nav{margin-left:auto;display:flex;gap:12px;font-size:13px}
+.top{display:flex;align-items:center;gap:10px;padding:12px 16px;
+  border-bottom:1px solid var(--border);position:sticky;top:0;
+  background:#0d1117f2;backdrop-filter:blur(8px);z-index:20}
+.top .brand{font-size:15px;font-weight:650;color:var(--fg);white-space:nowrap}
+.top nav{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.top nav a{color:var(--dim);font-size:13px;padding:6px 10px;border-radius:8px}
+.top nav a:hover{color:var(--fg);background:#21262d}
+.top nav a.on{color:var(--acc);background:var(--acc-dim)}
+.top .meta{color:var(--dim);font-size:12px}
 a{color:var(--acc);text-decoration:none}
 main{max-width:980px;margin:0 auto;padding:18px 14px 72px}
-.npm{margin:0 0 14px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;
-  background:var(--panel);font-size:13px;color:var(--dim)}
-.npm code{color:var(--fg);font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
 .tabs{display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap}
 .tabs button{background:var(--panel);color:var(--fg);border:1px solid var(--border);
   border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer}
@@ -70,39 +70,32 @@ pre{white-space:pre-wrap;word-break:break-word;font-size:13px;margin:0}
 .empty{color:var(--dim);font-size:13px;padding:18px 8px;text-align:center}
 .count{color:var(--dim);font-size:12px;margin:4px 0 10px}
 @media (max-width:640px){
-  header{padding:12px 14px}
+  .top{padding:10px 12px}
   .erow{padding:12px}
 }
 </style>
 </head>
 <body>
-<header>
-  <h1>Shared Brain</h1>
-  <span class="sub" id="stats">…</span>
+<header class="top">
+  <a class="brand" href="/">Agent Manager</a>
+  <span class="meta" id="stats"></span>
   <nav>
-    <a href="/">Home</a>
     <a href="/setup/">Setup</a>
     <a href="/connect/">Connect</a>
+    <a class="on" href="/brain/">Brain</a>
     <a href="/agents/">Agents</a>
   </nav>
 </header>
 <main>
-  <div class="npm">
-    Setup any agent with
-    <code>npx agent-manager-brain connect --url <span id="npm-url"></span> --token YOUR_TOKEN --agent &lt;platform&gt;</code>
-    · <a href="/connect/">one-click copy</a>
-    · <a href="https://www.npmjs.com/package/agent-manager-brain" target="_blank" rel="noopener">npm</a>
-  </div>
-
   <div class="tabs">
     <button data-tab="ask" class="on">Ask</button>
     <button data-tab="graph">Entities</button>
-    <button data-tab="packs">Context Packs</button>
+    <button data-tab="packs">Packs</button>
   </div>
 
   <section id="tab-ask">
     <div class="row">
-      <input type="text" id="q" placeholder="Ask the brain anything about your projects…">
+      <input type="text" id="q" placeholder="Ask…">
       <button onclick="ask()">Ask</button>
     </div>
     <div id="answer"></div>
@@ -132,16 +125,16 @@ pre{white-space:pre-wrap;word-break:break-word;font-size:13px;margin:0}
         <div id="detail-chunks"></div>
       </div>
     </div>
-    <p class="empty" id="entity-hint">Tap a row to open its details below.</p>
+    <p class="empty" id="entity-hint">Tap for details</p>
   </section>
 
   <section id="tab-packs" style="display:none">
     <div class="row">
       <select id="project"></select>
-      <button class="ghost" onclick="loadPack()">Load pack</button>
+      <button class="ghost" onclick="loadPack()">Load</button>
       <button class="ghost" onclick="copyPack()">Copy</button>
     </div>
-    <div class="card"><pre id="pack">Select a project to get an injectable context pack.</pre></div>
+    <div class="card"><pre id="pack">Pick a project.</pre></div>
   </section>
 </main>
 <script>
@@ -151,8 +144,6 @@ const TOKEN_KEY = 'am_token';
 let ENTITIES = [];
 let FILTER_TYPE = 'all';
 let SELECTED = null;
-
-$('#npm-url').textContent = location.origin.replace(/\/$/, '');
 
 async function api(path, opts={}) {
   const r = await fetch(path.startsWith('/') ? path : '/' + path, {
@@ -184,8 +175,7 @@ function esc(s) {
 
 async function boot() {
   const s = await api('/api/stats');
-  $('#stats').textContent =
-    `${s.sources} sources · ${s.chunks} chunks · ${s.entities} entities · ${s.edges} edges`;
+  $('#stats').textContent = `${s.entities} entities · ${s.chunks} chunks`;
   const ps = await api('/api/projects');
   $('#project').innerHTML = (ps.projects || []).map(p => `<option>${esc(p)}</option>`).join('');
   const es = await api('/api/entities');
@@ -220,7 +210,7 @@ function filteredEntities() {
 
 function renderEntities() {
   const rows = filteredEntities();
-  $('#entity-count').textContent = `${rows.length} shown · tap a row for details`;
+  $('#entity-count').textContent = `${rows.length}`;
   if (!rows.length) {
     $('#entity-list').innerHTML = '<div class="empty">No entities match this filter.</div>';
     return;

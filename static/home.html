@@ -3,37 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Manager — Shared brain for coding agents</title>
-<style>
-:root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--fg:#e6edf3;--dim:#8b949e;--acc:#58a6ff;--ok:#3fb950}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 ui-sans-serif,system-ui,sans-serif}
-header{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
-header h1{font-size:17px;margin:0}
-header nav{margin-left:auto;display:flex;gap:14px;font-size:13px}
-a{color:var(--acc);text-decoration:none}
-main{max-width:820px;margin:0 auto;padding:40px 18px 80px}
-.hero h2{font-size:clamp(28px,5vw,40px);line-height:1.15;margin:0 0 12px;letter-spacing:-.02em}
-.hero p{color:var(--dim);margin:0 0 22px;max-width:46ch}
-.actions{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 28px}
-.btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 16px;border-radius:10px;font-weight:600;font-size:14px;border:1px solid transparent}
-.btn.primary{background:var(--acc);color:#04121f}
-.btn.ghost{background:var(--panel);color:var(--fg);border-color:var(--border)}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:28px 0}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
-.card h3{margin:0 0 6px;font-size:15px}.card p{margin:0;color:var(--dim);font-size:13px}
-.box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:8px}
-.box label{display:block;font-size:12px;color:var(--dim);margin-bottom:6px}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-input{flex:1;min-width:180px;background:#0d1117;border:1px solid var(--border);color:var(--fg);border-radius:8px;padding:10px 12px;font:inherit}
-button.go{background:var(--ok);color:#04120a;border:0;border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer}
-.hint{font-size:12px;color:var(--dim);margin-top:8px}
-.status{font-size:13px;color:var(--dim);margin:0 0 10px}
-code{font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fg)}
-</style>
+<title>Agent Manager</title>
+<link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-<header>
-  <h1>Agent Manager</h1>
+<header class="top">
+  <a class="brand" href="/">Agent Manager</a>
   <nav>
     <a href="/setup/">Setup</a>
     <a href="/connect/">Connect</a>
@@ -41,39 +16,21 @@ code{font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fg)
     <a href="/agents/">Agents</a>
   </nav>
 </header>
-<main>
-  <section class="hero">
-    <h2>A shared brain for any coding agent</h2>
-    <p>Ingest your projects, answer with citations, and remember decisions over MCP — Cursor, Claude Code, VS Code, Windsurf, Cline, Continue, Zed, or plain HTTP.</p>
-    <div class="actions">
-      <a class="btn primary" href="/setup/">Get started</a>
-      <a class="btn ghost" href="/connect/">Connect an agent</a>
-      <a class="btn ghost" href="https://github.com/mazinb/agent-manager">GitHub</a>
-    </div>
-    <p class="status" id="status">Checking setup…</p>
-  </section>
-
-  <div class="box" id="token-box">
-    <label for="token">Already have a token? Save it in this browser</label>
-    <div class="row">
-      <input id="token" type="password" placeholder="Paste access token">
-      <button class="go" type="button" onclick="saveToken()">Save & open brain</button>
-    </div>
-    <p class="hint">Token stays in localStorage on this device. Use the same value as <code>X-Token</code> for MCP clients.</p>
+<main class="wrap">
+  <h1 class="hero">Shared brain for coding agents</h1>
+  <p class="sub" id="status">…</p>
+  <div class="actions">
+    <a class="btn primary" href="/setup/">Get token</a>
+    <a class="btn ghost" href="/connect/">Connect</a>
   </div>
 
-  <div class="grid">
-    <div class="card">
-      <h3>1. Get a token</h3>
-      <p>Fresh installs create one during setup. Hosted brains: paste a token you were given, or self-host your own.</p>
-    </div>
-    <div class="card">
-      <h3>2. Connect agents</h3>
-      <p>One-click copy for every major coding agent via <code>npx agent-manager-brain</code>.</p>
-    </div>
-    <div class="card">
-      <h3>3. Ask & remember</h3>
-      <p>Search the graph, pull context packs, and save notes so the next session starts informed.</p>
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label for="token">Token</label>
+        <input id="token" type="password" placeholder="Paste token" autocomplete="current-password">
+      </div>
+      <button class="btn ok" type="button" onclick="saveToken()">Open brain</button>
     </div>
   </div>
 </main>
@@ -82,16 +39,10 @@ const $ = id => document.getElementById(id);
 async function boot(){
   try{
     const s = await fetch('/api/setup/status').then(r=>r.json());
-    if(s.bootstrap){
-      $('status').innerHTML = 'This brain has no token yet — <a href="/setup/">create one now</a> (shown once; save it).';
-    } else if(s.signup_open){
-      $('status').innerHTML = 'Signup is open — <a href="/setup/">request a token</a>, then connect your agent.';
-    } else {
-      $('status').textContent = 'This brain is private. Paste a token below, or self-host to create your own.';
-    }
-  }catch{
-    $('status').textContent = 'Could not reach setup API.';
-  }
+    if(s.bootstrap) $('status').innerHTML = 'No token yet — <a href="/setup/">create one</a>.';
+    else if(s.signup_open) $('status').innerHTML = 'Signup open — <a href="/setup/">get a token</a>.';
+    else $('status').textContent = 'Private brain. Paste a token or self-host.';
+  }catch{ $('status').textContent = 'Offline.'; }
   const t = localStorage.getItem('am_token')||'';
   if(t) $('token').value = t;
 }

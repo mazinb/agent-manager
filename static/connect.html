@@ -4,389 +4,116 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Connect — Agent Manager</title>
+<link rel="stylesheet" href="/static/app.css">
 <style>
-:root { color-scheme: dark; --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#e6edf3; --dim:#8b949e; --acc:#58a6ff; --ok:#3fb950; }
-* { box-sizing: border-box; }
-body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 ui-sans-serif,system-ui,sans-serif; }
-header { display:flex; align-items:center; gap:14px; padding:16px 22px; border-bottom:1px solid var(--border); position:sticky; top:0; background:#0d1117f2; backdrop-filter:blur(8px); z-index:2; }
-header h1 { font-size:17px; margin:0; }
-header a { color:var(--dim); text-decoration:none; font-size:13px; }
-header a:hover { color:var(--fg); }
-header .spacer { flex:1; }
-main { max-width:920px; margin:0 auto; padding:22px 16px 80px; }
-.lead { color:var(--dim); margin:0 0 18px; max-width:60ch; }
-.row { display:flex; flex-wrap:wrap; gap:10px; margin:14px 0 22px; align-items:end; }
-label { display:block; font-size:12px; color:var(--dim); margin-bottom:4px; }
-input { width:100%; background:var(--panel); border:1px solid var(--border); color:var(--fg); border-radius:8px; padding:10px 12px; font:inherit; }
-.field { flex:1; min-width:220px; }
-.tabs { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 16px; }
-.tabs button { background:var(--panel); color:var(--fg); border:1px solid var(--border); border-radius:999px; padding:7px 12px; font-size:13px; cursor:pointer; }
-.tabs button.on { border-color:var(--acc); color:var(--acc); }
-.card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin:0 0 14px; }
-.card h2 { margin:0 0 6px; font-size:16px; }
-.card .steps { margin:10px 0 0; padding-left:18px; color:var(--dim); }
-.card .steps li { margin:4px 0; }
-.toolbar { display:flex; gap:8px; justify-content:flex-end; margin:10px 0 6px; }
-.toolbar button, .copy { background:#21262d; color:var(--fg); border:1px solid var(--border); border-radius:8px; padding:7px 12px; font-size:13px; cursor:pointer; }
-.toolbar button:hover, .copy:hover { border-color:var(--acc); }
-.toolbar button.ok { border-color:var(--ok); color:var(--ok); }
-pre { margin:0; background:#0d1117; border:1px solid var(--border); border-radius:10px; padding:12px 14px; overflow:auto; font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; word-break:break-word; }
-.hint { font-size:12px; color:var(--dim); margin-top:10px; }
-.tools { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.tools span { background:#21262d; border:1px solid var(--border); border-radius:999px; padding:2px 10px; font-size:12px; color:var(--dim); }
+.toolbar{display:flex;justify-content:flex-end;margin:0 0 8px}
+.copy{background:#21262d;color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
 </style>
 </head>
 <body>
-<header>
-  <h1>Connect any agent</h1>
-  <a href="/">Home</a>
-  <a href="/setup/">Setup</a>
-  <a href="/brain/">Brain</a>
-  <span class="spacer"></span>
-  <span class="hint" id="status">Paste your token to personalize the snippets.</span>
+<header class="top">
+  <a class="brand" href="/">Agent Manager</a>
+  <nav>
+    <a href="/setup/">Setup</a>
+    <a class="on" href="/connect/">Connect</a>
+    <a href="/brain/">Brain</a>
+    <a href="/agents/">Agents</a>
+  </nav>
 </header>
-<main>
-  <p class="lead">
-    Agent Manager is a shared brain over MCP. Point any coding agent at it —
-    Claude Code, VS Code, Cursor, Windsurf, Cline, Continue, Zed, Codex, Gemini, or plain HTTP.
-    npm: <code style="color:var(--fg)">agent-manager-brain</code>
-    (<a href="https://www.npmjs.com/package/agent-manager-brain">npm</a> ·
-    <a href="https://github.com/mazinb/agent-manager/tree/main/npm">source</a>).
-    Need a token first? <a href="/setup/">Get started</a>.
-  </p>
-  <div class="card" id="token-cta" style="margin-bottom:14px">
-    <h2 style="margin:0 0 6px;font-size:15px">Access token</h2>
-    <p class="hint" style="margin:0" id="token-cta-text">Checking setup…</p>
-  </div>
+<main class="wrap">
+  <p class="sub" id="status"><a href="/setup/">Get a token</a> if you don’t have one.</p>
 
-  <div class="row">
-    <div class="field">
-      <label for="base">Brain URL</label>
-      <input id="base" value="" placeholder="https://bot.getzoro.com">
-    </div>
-    <div class="field">
-      <label for="token">Access token</label>
-      <input id="token" type="password" placeholder="same token as the dashboard">
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label for="base">URL</label>
+        <input id="base" placeholder="https://bot.getzoro.com">
+      </div>
+      <div class="field">
+        <label for="token">Token</label>
+        <input id="token" type="password" placeholder="Access token" autocomplete="current-password">
+      </div>
     </div>
   </div>
 
   <div class="tabs" id="tabs"></div>
   <div id="panel"></div>
-
-  <div class="card">
-    <h2>What you get</h2>
-    <p class="hint" style="margin:0">Once connected, the agent can call these MCP tools:</p>
-    <div class="tools">
-      <span>ask</span><span>search</span><span>entity</span><span>context_pack</span>
-      <span>projects</span><span>stats</span><span>note</span>
-    </div>
-  </div>
 </main>
 <script>
 const $ = id => document.getElementById(id);
-const DEFAULT_BASE = location.origin.includes('localhost') || location.origin.includes('127.0.0.1')
+const DEFAULT_BASE = (location.origin.includes('localhost') || location.origin.includes('127.0.0.1'))
   ? location.origin : 'https://bot.getzoro.com';
-
 $('base').value = localStorage.getItem('am_base') || DEFAULT_BASE;
 $('token').value = localStorage.getItem('am_token') || '';
-
-fetch('/api/setup/status').then(r => r.json()).then(s => {
-  const el = $('token-cta-text');
-  if (s.bootstrap) {
-    el.innerHTML = 'This brain has no token yet. <a href="/setup/">Create one</a> (shown once — save it), then come back here.';
-  } else if (s.signup_open) {
-    el.innerHTML = 'Signup is open. <a href="/setup/">Request a token</a>, paste it above, then copy a platform snippet.';
-  } else if (!token()) {
-    el.innerHTML = 'This brain is private. Paste a token you already have, or <a href="/setup/">self-host</a> to create your own.';
-  } else {
-    el.textContent = 'Token loaded from this browser. Snippets below include it — treat them as secrets.';
-  }
-}).catch(() => { $('token-cta-text').textContent = 'Paste a token above to personalize snippets.'; });
 
 function base() {
   return ($('base').value || DEFAULT_BASE).replace(/\/+$/, '').replace(/\/mcp$/, '');
 }
 function token() { return ($('token').value || '').trim(); }
 function mcpUrl() { return base() + '/mcp'; }
-function esc(s) { return String(s ?? ''); }
+function tokFlag() { return token() ? ` --token ${token()}` : ' --token YOUR_TOKEN'; }
 
-function mcpJson(style='cursor') {
+function mcpJson(style='generic') {
   const t = token();
-  const headers = t ? { 'X-Token': t } : {};
   if (style === 'vscode') {
     return JSON.stringify({
-      servers: {
-        'agent-manager': {
-          type: 'http',
-          url: mcpUrl(),
-          ...(t ? { headers: { 'X-Token': t } } : {})
-        }
-      }
+      servers: { 'agent-manager': {
+        type: 'http', url: mcpUrl(),
+        ...(t ? { headers: { 'X-Token': t } } : {}),
+      }},
     }, null, 2);
   }
   if (style === 'continue') {
-    return [
-      'mcpServers:',
-      '  - name: agent-manager',
-      `    url: ${mcpUrl()}`,
-      ...(t ? [`    headers:`, `      X-Token: ${t}`] : []),
-    ].join('\n');
+    return ['mcpServers:', '  - name: agent-manager', `    url: ${mcpUrl()}`,
+      ...(t ? ['    headers:', `      X-Token: ${t}`] : [])].join('\n');
   }
   if (style === 'zed') {
     return JSON.stringify({
-      context_servers: {
-        'agent-manager': {
-          url: mcpUrl(),
-          ...(t ? { headers: { 'X-Token': t } } : {})
-        }
-      }
+      context_servers: { 'agent-manager': {
+        url: mcpUrl(), ...(t ? { headers: { 'X-Token': t } } : {}),
+      }},
     }, null, 2);
   }
   return JSON.stringify({
-    mcpServers: {
-      'agent-manager': {
-        url: mcpUrl(),
-        ...(t ? { headers } : {})
-      }
-    }
+    mcpServers: { 'agent-manager': {
+      url: mcpUrl(), ...(t ? { headers: { 'X-Token': t } } : {}),
+    }},
   }, null, 2);
 }
 
 const PLATFORMS = [
-  {
-    id: 'oneclick',
-    label: 'One-click',
-    title: 'One-liner setup (npm)',
-    steps: [
-      'Copy the command for your agent.',
-      'Run it in a terminal on your machine (Node 18+).',
-      'Restart the agent app if it was already open.',
-    ],
-    code() {
-      const t = token();
-      const tok = t ? ` --token ${t}` : ' --token YOUR_TOKEN';
-      return [
-        `# package: npm i -g agent-manager-brain   OR use npx below`,
-        ``,
-        `# Cursor`,
-        `npx --yes agent-manager-brain connect --url ${base()}${tok} --agent cursor`,
-        ``,
-        `# Claude Code`,
-        `npx --yes agent-manager-brain connect --url ${base()}${tok} --agent claude`,
-        ``,
-        `# VS Code / Copilot`,
-        `npx --yes agent-manager-brain connect --url ${base()}${tok} --agent vscode`,
-        ``,
-        `# Windsurf`,
-        `npx --yes agent-manager-brain connect --url ${base()}${tok} --agent windsurf`,
-        ``,
-        `# Cline`,
-        `npx --yes agent-manager-brain connect --url ${base()}${tok} --agent cline`,
-        ``,
-        `# Continue`,
-        `npx --yes agent-manager-brain connect --url ${base()}${tok} --agent continue`,
-        ``,
-        `# Zed`,
-        `npx --yes agent-manager-brain connect --url ${base()}${tok} --agent zed`,
-        ``,
-        `# Print generic MCP JSON`,
-        `npx --yes agent-manager-brain connect --url ${base()}${tok} --agent generic`,
-      ].join('\n');
-    }
-  },
-  {
-    id: 'selfhost',
-    label: 'Self-host',
-    title: 'Self-host locally (npm)',
-    steps: [
-      'Needs Node 18+, git, and python3 on your PATH.',
-      'init clones the server and writes .env + config.',
-      'serve starts http://127.0.0.1:8075 (UI + /mcp).',
-      'Then connect your agent to the local URL.',
-    ],
-    code() {
-      return [
-        `# 1) Install / bootstrap`,
-        `npx --yes agent-manager-brain init`,
-        ``,
-        `# 2) Run the brain (Python stdlib server, orchestrated by npm)`,
-        `npx --yes agent-manager-brain serve`,
-        ``,
-        `# 3) Point your agent at local MCP`,
-        `npx --yes agent-manager-brain connect \\`,
-        `  --url http://127.0.0.1:8075 \\`,
-        `  --token "$(grep AGENT_MANAGER_TOKEN ~/.agent-manager/app/.env | cut -d= -f2)" \\`,
-        `  --agent cursor`,
-        ``,
-        `# Optional: open the same one-click UI locally`,
-        `# http://127.0.0.1:8075/connect/`,
-      ].join('\n');
-    }
-  },
-  {
-    id: 'cursor',
-    label: 'Cursor',
-    title: 'Cursor',
-    steps: [
-      'Open ~/.cursor/mcp.json (or project .cursor/mcp.json).',
-      'Paste the JSON below (merge under mcpServers if the file already exists).',
-      'Restart Cursor. Confirm agent-manager tools appear in Agent chat.',
-    ],
-    code: () => mcpJson('cursor'),
-  },
-  {
-    id: 'claude',
-    label: 'Claude Code',
-    title: 'Claude Code',
-    steps: [
-      'Run the command below in a terminal.',
-      'Start a new Claude Code session and ask it to search the brain.',
-    ],
-    code() {
-      const t = token();
-      const hdr = t ? ` \\\n  --header "X-Token: ${t}"` : '';
-      return `claude mcp add --transport http agent-manager ${mcpUrl()}${hdr}`;
-    }
-  },
-  {
-    id: 'vscode',
-    label: 'VS Code',
-    title: 'VS Code / GitHub Copilot',
-    steps: [
-      'Create or edit .vscode/mcp.json in your project (or use your user MCP settings).',
-      'Paste the JSON below.',
-      'Reload VS Code and enable the agent-manager server in Copilot Chat / MCP.',
-    ],
-    code: () => mcpJson('vscode'),
-  },
-  {
-    id: 'windsurf',
-    label: 'Windsurf',
-    title: 'Windsurf',
-    steps: [
-      'Open Windsurf MCP settings (Cascade → MCP servers), or edit ~/.codeium/windsurf/mcp_config.json.',
-      'Paste the JSON below under mcpServers.',
-      'Reload Windsurf.',
-    ],
-    code: () => mcpJson('cursor'),
-  },
-  {
-    id: 'cline',
-    label: 'Cline',
-    title: 'Cline',
-    steps: [
-      'Open Cline → MCP Servers → Configure, or edit cline_mcp_settings.json.',
-      'Paste the JSON below.',
-      'Toggle agent-manager on and start a new task.',
-    ],
-    code: () => mcpJson('cursor'),
-  },
-  {
-    id: 'continue',
-    label: 'Continue',
-    title: 'Continue.dev',
-    steps: [
-      'Open ~/.continue/config.yaml (or your assistant config).',
-      'Paste the YAML block below.',
-      'Reload the Continue extension.',
-    ],
-    code: () => mcpJson('continue'),
-  },
-  {
-    id: 'zed',
-    label: 'Zed',
-    title: 'Zed',
-    steps: [
-      'Open Zed settings.json.',
-      'Merge the context_servers block below.',
-      'Restart Zed agent / assistant.',
-    ],
-    code: () => mcpJson('zed'),
-  },
-  {
-    id: 'codex',
-    label: 'Codex',
-    title: 'OpenAI Codex CLI',
-    steps: [
-      'Add the MCP server to your Codex config (config.toml / MCP settings, depending on version).',
-      'Or paste the generic JSON into whatever MCP bridge you use with Codex.',
-      'Verify with a tools/list call against /mcp.',
-    ],
-    code: () => mcpJson('cursor'),
-  },
-  {
-    id: 'gemini',
-    label: 'Gemini',
-    title: 'Gemini CLI',
-    steps: [
-      'Add agent-manager as an HTTP MCP server in your Gemini CLI MCP config.',
-      'Use the JSON below if the CLI expects mcpServers.',
-      'Restart the CLI session.',
-    ],
-    code: () => mcpJson('cursor'),
-  },
-  {
-    id: 'rest',
-    label: 'REST / curl',
-    title: 'REST / curl',
-    steps: [
-      'No MCP client required — call the HTTP API directly.',
-      'Send X-Token (or Authorization: Bearer) on every request.',
-    ],
-    code() {
-      const t = token() || 'YOUR_TOKEN';
-      const b = base();
-      return [
-        `# Search`,
-        `curl -s "${b}/api/search?q=tutor" -H "X-Token: ${t}" | jq`,
-        ``,
-        `# Ask (cited answer when an LLM backend is configured)`,
-        `curl -s -X POST "${b}/api/ask" -H "Content-Type: application/json" -H "X-Token: ${t}" \\`,
-        `  -d '{"q":"what ports are live?","use_llm":true}' | jq`,
-        ``,
-        `# Share a note`,
-        `curl -s -X POST "${b}/api/note" -H "Content-Type: application/json" -H "X-Token: ${t}" \\`,
-        `  -d '{"project":"my-agent","title":"setup","body":"I care about fast TTS."}' | jq`,
-        ``,
-        `# MCP tools/list`,
-        `curl -s -X POST "${b}/mcp" -H "Content-Type: application/json" -H "X-Token: ${t}" \\`,
-        `  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq`,
-      ].join('\n');
-    }
-  },
-  {
-    id: 'prompt',
-    label: 'System prompt',
-    title: 'System prompt (any agent)',
-    steps: [
-      'Paste this into the agent’s system prompt / custom instructions when MCP wiring is awkward.',
-      'The agent can still use curl or fetch against the HTTP API.',
-    ],
-    code() {
-      const t = token() || 'YOUR_TOKEN';
-      const b = base();
-      return [
-        `You have a shared context brain at ${b}.`,
-        `Auth header on every call: X-Token: ${t}`,
-        `- Search:  GET  ${b}/api/search?q=...`,
-        `- Ask:     POST ${b}/api/ask     {"q":"...","use_llm":true}`,
-        `- Pack:    GET  ${b}/api/context?project=NAME`,
-        `- Remember: POST ${b}/api/note   {"project":"your-slug","title":"...","body":"..."}`,
-        `- MCP:     POST ${b}/mcp`,
-        `Before guessing about prior decisions, search or ask the brain. After durable work, save a note.`,
-      ].join('\n');
-    }
-  },
+  { id:'npx', label:'npm', title:'npx',
+    code(){ return `npx --yes agent-manager-brain connect --url ${base()}${tokFlag()} --agent vscode`; }},
+  { id:'selfhost', label:'Self-host', title:'Self-host',
+    code(){ return [
+      `npx --yes agent-manager-brain init`,
+      `npx --yes agent-manager-brain serve`,
+      `npx --yes agent-manager-brain connect --url http://127.0.0.1:8075${tokFlag()} --agent generic`,
+    ].join('\n'); }},
+  { id:'claude', label:'Claude', title:'Claude Code',
+    code(){ const h = token() ? ` \\\n  --header "X-Token: ${token()}"` : '';
+      return `claude mcp add --transport http agent-manager ${mcpUrl()}${h}`; }},
+  { id:'vscode', label:'VS Code', title:'VS Code / Copilot', code:()=>mcpJson('vscode') },
+  { id:'cursor', label:'Cursor', title:'Cursor', code:()=>mcpJson('generic') },
+  { id:'windsurf', label:'Windsurf', title:'Windsurf', code:()=>mcpJson('generic') },
+  { id:'cline', label:'Cline', title:'Cline', code:()=>mcpJson('generic') },
+  { id:'continue', label:'Continue', title:'Continue', code:()=>mcpJson('continue') },
+  { id:'zed', label:'Zed', title:'Zed', code:()=>mcpJson('zed') },
+  { id:'generic', label:'JSON', title:'MCP JSON', code:()=>mcpJson('generic') },
+  { id:'curl', label:'curl', title:'curl',
+    code(){ const t=token()||'YOUR_TOKEN'; const b=base();
+      return `curl -s "${b}/api/search?q=test" -H "X-Token: ${t}"`; }},
 ];
 
-let ACTIVE = 'oneclick';
+let ACTIVE = 'npx';
 
 function persist() {
   localStorage.setItem('am_base', base());
   if (token()) localStorage.setItem('am_token', token());
-  $('status').textContent = token()
-    ? 'Snippets include your token — treat them as secrets.'
-    : 'Paste your token to personalize the snippets.';
+  $('status').innerHTML = token()
+    ? 'Token in snippets — keep private.'
+    : '<a href="/setup/">Get a token</a> if you don’t have one.';
 }
 
 async function copyText(text, btn) {
@@ -395,33 +122,20 @@ async function copyText(text, btn) {
     const old = btn.textContent;
     btn.textContent = 'Copied';
     btn.classList.add('ok');
-    setTimeout(() => { btn.textContent = old; btn.classList.remove('ok'); }, 1200);
-  } catch {
-    btn.textContent = 'Select & copy';
-  }
-}
-
-function renderTabs() {
-  $('tabs').innerHTML = PLATFORMS.map(p =>
-    `<button data-id="${p.id}" class="${p.id===ACTIVE?'on':''}">${p.label}</button>`
-  ).join('');
-  $('tabs').onclick = e => {
-    const b = e.target.closest('button[data-id]');
-    if (!b) return;
-    ACTIVE = b.dataset.id;
-    render();
-  };
+    setTimeout(() => { btn.textContent = old; btn.classList.remove('ok'); }, 1000);
+  } catch { btn.textContent = 'Select'; }
 }
 
 function render() {
   persist();
-  renderTabs();
+  $('tabs').innerHTML = PLATFORMS.map(p =>
+    `<button data-id="${p.id}" class="${p.id===ACTIVE?'on':''}">${p.label}</button>`
+  ).join('');
   const p = PLATFORMS.find(x => x.id === ACTIVE) || PLATFORMS[0];
   const code = p.code();
   $('panel').innerHTML = `
     <div class="card">
       <h2>${p.title}</h2>
-      <ol class="steps">${p.steps.map(s => `<li>${s}</li>`).join('')}</ol>
       <div class="toolbar"><button class="copy" type="button">Copy</button></div>
       <pre id="snippet"></pre>
     </div>`;
@@ -429,6 +143,12 @@ function render() {
   $('panel').querySelector('.copy').onclick = ev => copyText(code, ev.currentTarget);
 }
 
+$('tabs').onclick = e => {
+  const b = e.target.closest('button[data-id]');
+  if (!b) return;
+  ACTIVE = b.dataset.id;
+  render();
+};
 $('base').addEventListener('input', render);
 $('token').addEventListener('input', render);
 render();
