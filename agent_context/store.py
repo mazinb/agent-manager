@@ -121,16 +121,44 @@ def set_note_meta(con, sid, confidence=None, based_on=None):
         (time.time(), confidence, json.dumps(based_on) if based_on else None, sid))
 
 
+def flag_stale_for_sources(con, changed_paths):
+    """Mark notes stale when a source they are based on changed or vanished.
+
+    Returns the number of notes flagged. Stale notes are excluded from packs
+    and search until re-saved (set_note_meta clears the flag)."""
+    changed = set(changed_paths)
+    if not changed:
+        return 0
+    rows = con.execute(
+        "SELECT id, based_on FROM sources WHERE kind='note' "
+        "AND based_on IS NOT NULL AND stale=0").fetchall()
+    n = 0
+    for r in rows:
+        try:
+            deps = json.loads(r["based_on"])
+        except (ValueError, TypeError):
+            continue
+        if changed & set(deps):
+            con.execute("UPDATE sources SET stale=1 WHERE id=?", (r["id"],))
+            n += 1
+    return n
+
+
 def prune_stale(con, live_paths):
     """Delete sources no longer on disk. Notes (kind='note') never live on
-    disk — they are agent-written rows — so they are always protected."""
+    disk — they are agent-written rows — so they are always protected.
+
+    Returns the list of removed paths (empty list if none)."""
     rows = con.execute("SELECT id, path, kind FROM sources").fetchall()
-    gone = [r["id"] for r in rows
+    gone = [r["path"] for r in rows
             if r["kind"] != "note" and r["path"] not in live_paths]
-    for sid in gone:
+    for path in gone:
+        sid = con.execute("SELECT id FROM sources WHERE path=?", (path,)).fetchone()[0]
+        con.execute("DELETE FROM chunks_fts WHERE rowid IN "
+                    "(SELECT id FROM chunks WHERE source_id=?)", (sid,))
         con.execute("DELETE FROM chunks WHERE source_id=?", (sid,))
         con.execute("DELETE FROM sources WHERE id=?", (sid,))
-    return len(gone)
+    return gone
 
 
 def rebuild_fts(con):

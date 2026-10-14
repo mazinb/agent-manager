@@ -30,7 +30,7 @@ class Chunk0NotesSurviveRefresh(unittest.TestCase):
             "SELECT path, kind FROM sources WHERE kind='note'").fetchone()
         self.assertIsNotNone(row, "note was wiped by prune_stale")
         self.assertEqual(row["path"], "note:myproj/deploy-notes")
-        self.assertEqual(removed, 0)
+        self.assertEqual(removed, [])
 
     def test_prune_still_removes_dead_files(self):
         con = fresh_con()
@@ -39,7 +39,7 @@ class Chunk0NotesSurviveRefresh(unittest.TestCase):
             123.0, 10, [("gone", "body")])
         con.commit()
         removed = store.prune_stale(con, {})
-        self.assertEqual(removed, 1)
+        self.assertEqual(removed, ["/tmp/gone.md"])
         self.assertEqual(con.execute("SELECT COUNT(*) FROM sources").fetchone()[0], 0)
 
 
@@ -93,6 +93,72 @@ class Chunk1TrustMetadata(unittest.TestCase):
             "SELECT confidence, based_on FROM sources WHERE kind='note'").fetchone()
         self.assertEqual(row["confidence"], 0.5)
         self.assertEqual(json.loads(row["based_on"]), ["README.md"])
+
+
+class Chunk2SourceChangeInvalidation(unittest.TestCase):
+    def _seed(self, con):
+        # a source doc + a note derived from it
+        store.upsert_source(con, "docs/README.md", "project_readme", "p",
+                            1, 10, [("README", "deploy with script A")])
+        sid = store.upsert_source(con, "note:p/deploy", "note", "p", 1, 20,
+                                  [("deploy", "NOTE-ONLY-MARKER alpha 7")])
+        store.set_note_meta(con, sid, confidence=0.9, based_on=["docs/README.md"])
+        con.commit()
+
+    def test_changed_source_flags_note_stale(self):
+        con = fresh_con()
+        self._seed(con)
+        n = store.flag_stale_for_sources(con, ["docs/README.md"])
+        self.assertEqual(n, 1)
+        self.assertEqual(con.execute(
+            "SELECT stale FROM sources WHERE path='note:p/deploy'"
+        ).fetchone()["stale"], 1)
+
+    def test_deleted_source_flags_note_stale(self):
+        con = fresh_con()
+        self._seed(con)
+        gone = store.prune_stale(con, {"note:p/deploy": True})  # README not live
+        self.assertEqual(gone, ["docs/README.md"])
+        self.assertEqual(store.flag_stale_for_sources(con, gone), 1)
+        self.assertEqual(con.execute(
+            "SELECT stale FROM sources WHERE path='note:p/deploy'"
+        ).fetchone()["stale"], 1)
+
+    def test_resave_clears_stale(self):
+        con = fresh_con()
+        self._seed(con)
+        store.flag_stale_for_sources(con, ["docs/README.md"])
+        sid = con.execute(
+            "SELECT id FROM sources WHERE path='note:p/deploy'").fetchone()[0]
+        store.set_note_meta(con, sid, confidence=0.9, based_on=["docs/README.md"])
+        self.assertEqual(con.execute(
+            "SELECT stale FROM sources WHERE id=?", (sid,)).fetchone()["stale"], 0)
+
+    def test_stale_note_excluded_from_search_and_pack(self):
+        from agent_context import query
+        con = fresh_con()
+        self._seed(con)
+        sid = con.execute(
+            "SELECT id FROM sources WHERE path='note:p/deploy'").fetchone()[0]
+        con.execute("UPDATE sources SET stale=1 WHERE id=?", (sid,))
+        con.commit()
+        # visible with include_stale
+        self.assertTrue(any(r["path"] == "note:p/deploy"
+                            for r in query.search(con, "deploy", include_stale=True)))
+        # hidden by default
+        self.assertEqual(
+            [r for r in query.search(con, "deploy") if r["path"] == "note:p/deploy"],
+            [])
+        pack = query.context_pack(con, "p")
+        self.assertNotIn("NOTE-ONLY-MARKER", pack)
+
+    def test_unrelated_change_does_not_flag(self):
+        con = fresh_con()
+        self._seed(con)
+        self.assertEqual(store.flag_stale_for_sources(con, ["other/file.md"]), 0)
+        self.assertEqual(con.execute(
+            "SELECT stale FROM sources WHERE path='note:p/deploy'"
+        ).fetchone()["stale"], 0)
 
 
 if __name__ == "__main__":

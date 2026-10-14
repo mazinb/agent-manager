@@ -384,7 +384,8 @@ class Handler(BaseHTTPRequestHandler):
         qs = (payload.get("q") or "").strip()
         if not qs:
             return self._json(400, {"error": "empty q"})
-        chunks = query.search(BRAIN.con, qs)
+        chunks = query.search(BRAIN.con, qs,
+                              include_stale=bool(payload.get("include_stale", False)))
         answer = None
         if payload.get("use_llm", True):
             lc = BRAIN.config.get("llm") or {}

@@ -18,7 +18,8 @@ PROTOCOL_VERSION = "2024-11-05"
 def _search(brain, args):
     from . import query
     return {"results": query.search(
-        brain.con, args.get("q", ""), int(args.get("limit", 12)))}
+        brain.con, args.get("q", ""), int(args.get("limit", 12)),
+        include_stale=bool(args.get("include_stale", False)))}
 
 
 def _ask(brain, args):
@@ -26,7 +27,8 @@ def _ask(brain, args):
     q = (args.get("q") or "").strip()
     if not q:
         raise ValueError("q is required")
-    chunks = query.search(brain.con, q)
+    chunks = query.search(brain.con, q,
+                          include_stale=bool(args.get("include_stale", False)))
     answer = None
     if args.get("use_llm", True):
         lc = brain.config.get("llm") or {}
@@ -90,9 +92,11 @@ def _note(brain, args):
 
 
 TOOLS = [
-    {"name": "search", "description": "Full-text + entity search over the shared brain.",
+    {"name": "search", "description": "Full-text + entity search over the shared brain. "
+     "Stale notes (based-on source changed) are excluded unless include_stale.",
      "inputSchema": {"type": "object", "properties": {
-         "q": {"type": "string"}, "limit": {"type": "integer", "default": 12}},
+         "q": {"type": "string"}, "limit": {"type": "integer", "default": 12},
+         "include_stale": {"type": "boolean", "default": False}},
          "required": ["q"]}},
     {"name": "ask", "description": "Grounded question answering over the brain; "
      "returns a cited answer when an LLM backend is configured.",

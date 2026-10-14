@@ -24,16 +24,23 @@ def _body_without_heading(text, heading):
     return text
 
 
-def search(con, q, limit=12):
-    """Hybrid: FTS hits + chunks mentioning entities named in the query."""
+def search(con, q, limit=12, include_stale=False):
+    """Hybrid: FTS hits + chunks mentioning entities named in the query.
+
+    Stale notes (their based-on source changed or vanished) are excluded
+    unless include_stale=True; the `stale` field still rides on every result.
+    """
     expr = _fts_expr(q)
+    stale_guard = "" if include_stale else \
+        " AND NOT (s.kind='note' AND COALESCE(s.stale, 0))"
     results = {}
     if expr:
         rows = con.execute(
-            "SELECT c.id, c.heading, c.text, s.path, s.project, s.kind "
+            "SELECT c.id, c.heading, c.text, s.path, s.project, s.kind, s.stale "
             "FROM chunks_fts f JOIN chunks c ON c.id=f.rowid "
             "JOIN sources s ON c.source_id=s.id "
-            "WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?", (expr, limit * 2))
+            "WHERE chunks_fts MATCH ?" + stale_guard +
+            " ORDER BY rank LIMIT ?", (expr, limit * 2))
         for r in rows:
             results[r["id"]] = dict(r)
     # entity expansion: query names an entity -> its mentioned chunks
@@ -42,10 +49,11 @@ def search(con, q, limit=12):
                            (m,)).fetchone()
         if erow:
             rows = con.execute(
-                "SELECT c.id, c.heading, c.text, s.path, s.project, s.kind "
+                "SELECT c.id, c.heading, c.text, s.path, s.project, s.kind, s.stale "
                 "FROM mentions mn JOIN chunks c ON c.id=mn.chunk_id "
                 "JOIN sources s ON c.source_id=s.id "
-                "WHERE mn.entity_id=? LIMIT ?", (erow["id"], limit))
+                "WHERE mn.entity_id=?" + stale_guard + " LIMIT ?",
+                (erow["id"], limit))
             for r in rows:
                 results.setdefault(r["id"], dict(r))
     # rank: project matches + shorter chunks first as a cheap relevance proxy
@@ -82,6 +90,7 @@ def context_pack(con, project, max_chars=6000):
     rows = con.execute(
         "SELECT s.kind, c.heading, c.text FROM chunks c "
         "JOIN sources s ON c.source_id=s.id WHERE s.project=? "
+        "AND NOT (s.kind='note' AND COALESCE(s.stale, 0)) "
         "ORDER BY CASE s.kind WHEN 'project_readme' THEN 0 "
         "WHEN 'rule' THEN 1 WHEN 'soul' THEN 2 WHEN 'skill' THEN 3 "
         "WHEN 'memory' THEN 4 WHEN 'services' THEN 5 WHEN 'git' THEN 6 "
