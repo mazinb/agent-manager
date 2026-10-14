@@ -368,14 +368,38 @@ class Handler(BaseHTTPRequestHandler):
                               {"agents": store.list_agents(BRAIN.con)})
         if path == "/api/roster/agents":
             return self._json(200, {"agents": roster.list_agents(BRAIN.con)})
+        if path == "/api/roster/boards":
+            return self._json(200, {"boards": roster.list_boards(BRAIN.con)})
+        if path == "/api/roster/board":
+            try:
+                board_id = (q.get("id") or [None])[0]
+                return self._json(200, roster.get_board(
+                    BRAIN.con,
+                    chat=(q.get("chat") or [None])[0],
+                    board_id=int(board_id) if board_id else None))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
         if path == "/api/roster/tasks":
-            return self._json(200, {"tasks": roster.list_tasks(
-                BRAIN.con,
-                status=(q.get("status") or [None])[0],
-                assignee=(q.get("assignee") or [None])[0],
-                limit=int((q.get("limit") or ["100"])[0]))})
+            board_id = (q.get("board_id") or [None])[0]
+            try:
+                return self._json(200, {"tasks": roster.list_tasks(
+                    BRAIN.con,
+                    status=(q.get("status") or [None])[0],
+                    assignee=(q.get("assignee") or [None])[0],
+                    chat=(q.get("chat") or [None])[0],
+                    board_id=int(board_id) if board_id else None,
+                    limit=int((q.get("limit") or ["100"])[0]))})
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
         if path == "/api/roster/rules":
-            return self._json(200, {"rules": roster.list_rules(BRAIN.con)})
+            board_id = (q.get("board_id") or [None])[0]
+            try:
+                return self._json(200, {"rules": roster.list_rules(
+                    BRAIN.con,
+                    chat=(q.get("chat") or [None])[0],
+                    board_id=int(board_id) if board_id else None)})
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
         if path == "/api/inbox/messages":
             to_agent = (q.get("to") or q.get("to_agent") or [None])[0]
             agent = (q.get("from") or q.get("agent") or [None])[0]
@@ -490,6 +514,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/ask", "/api/refresh", "/api/note",
             "/api/project/visibility", "/mcp",
             "/api/roster/agents", "/api/roster/agents/key",
+            "/api/roster/boards", "/api/roster/board/members",
+            "/api/roster/board/members/remove",
             "/api/roster/tasks", "/api/roster/tasks/claim",
             "/api/roster/tasks/update", "/api/roster/rules",
         ):
@@ -516,8 +542,38 @@ class Handler(BaseHTTPRequestHandler):
                     BRAIN.con, payload.get("name") or ""))
             except ValueError as e:
                 return self._json(400, {"error": str(e)})
+        if path == "/api/roster/boards":
+            try:
+                return self._json(201, roster.get_or_create_board(
+                    BRAIN.con,
+                    payload.get("chat") or "",
+                    title=payload.get("title") or ""))
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/board/members":
+            try:
+                bid = payload.get("board_id")
+                return self._json(200, roster.add_member(
+                    BRAIN.con,
+                    board_id=int(bid) if bid not in (None, "") else None,
+                    chat=payload.get("chat"),
+                    agent=payload.get("agent") or "",
+                    role=payload.get("role") or "worker"))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/board/members/remove":
+            try:
+                bid = payload.get("board_id")
+                return self._json(200, roster.remove_member(
+                    BRAIN.con,
+                    board_id=int(bid) if bid not in (None, "") else None,
+                    chat=payload.get("chat"),
+                    agent=payload.get("agent") or ""))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
         if path == "/api/roster/tasks":
             try:
+                bid = payload.get("board_id")
                 return self._json(201, roster.add_task(
                     BRAIN.con,
                     title=payload.get("title") or "",
@@ -525,8 +581,10 @@ class Handler(BaseHTTPRequestHandler):
                     assignee=payload.get("assignee") or "",
                     parallel=payload.get("parallel"),
                     created_by=payload.get("created_by") or "you",
-                    auto_route=payload.get("auto_route", True)))
-            except ValueError as e:
+                    auto_route=payload.get("auto_route", True),
+                    chat=payload.get("chat"),
+                    board_id=int(bid) if bid not in (None, "") else None))
+            except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
         if path == "/api/roster/tasks/claim":
             try:
@@ -548,9 +606,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": str(e)})
         if path == "/api/roster/rules":
             try:
+                bid = payload.get("board_id")
                 return self._json(200, {
-                    "rules": roster.set_rules(BRAIN.con, payload.get("rules") or [])})
-            except ValueError as e:
+                    "rules": roster.set_rules(
+                        BRAIN.con, payload.get("rules") or [],
+                        chat=payload.get("chat"),
+                        board_id=int(bid) if bid not in (None, "") else None)})
+            except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
 
         if path == "/mcp":

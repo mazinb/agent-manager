@@ -87,7 +87,7 @@ tr:last-child td{border-bottom:0}
 </header>
 <main class="wrap">
   <h1 class="hero">Agents</h1>
-  <p class="sub">Shared tasks across Hermes, Grok, Cursor — not tied to one repo.</p>
+  <p class="sub">Boards linked to inbox chats. Add agents, then assign work.</p>
 
   <div class="card" id="gate">
     <h2>Token</h2>
@@ -111,6 +111,43 @@ tr:last-child td{border-bottom:0}
   </div>
 
   <div id="app" class="hidden">
+    <div class="card">
+      <h2>Board</h2>
+      <div class="row">
+        <div class="field">
+          <label>Chat</label>
+          <select id="board-sel"></select>
+        </div>
+        <div class="field">
+          <label>New chat</label>
+          <input id="new-chat" placeholder="e.g. travel">
+        </div>
+        <button type="button" class="btn primary" id="btn-new-board">Open</button>
+      </div>
+      <p class="hint" id="board-link">Board ↔ inbox chat. Members may claim tasks.</p>
+    </div>
+
+    <div class="card">
+      <h2>Members</h2>
+      <table>
+        <thead><tr><th>Agent</th><th>Role</th><th></th></tr></thead>
+        <tbody id="member-rows"></tbody>
+      </table>
+      <div class="row" style="margin-top:12px">
+        <div class="field"><label>Add agent</label>
+          <select id="member-agent"></select>
+        </div>
+        <div class="field" style="flex:0 0 120px"><label>Role</label>
+          <select id="member-role">
+            <option value="worker">worker</option>
+            <option value="member">member</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+        <button type="button" class="btn primary" id="btn-add-member">Add</button>
+      </div>
+    </div>
+
     <div class="card">
       <h2>Roster</h2>
       <table>
@@ -147,12 +184,12 @@ tr:last-child td{border-bottom:0}
         </div>
         <button type="button" class="btn primary" id="btn-add-task">Add</button>
       </div>
-      <p class="hint">Leave assign empty to use rules (e.g. “on-device” → hermes).</p>
+      <p class="hint">Only board members can be assigned or claim.</p>
     </div>
 
     <div class="card">
       <h2>Rules</h2>
-      <p class="hint" style="margin:0 0 10px">Match text → agent. First match wins.</p>
+      <p class="hint" style="margin:0 0 10px">Match text → agent on this board. First match wins.</p>
       <div id="rules"></div>
       <div class="actions">
         <button type="button" class="btn ghost" id="btn-add-rule">Add rule</button>
@@ -165,7 +202,9 @@ tr:last-child td{border-bottom:0}
 const $ = id => document.getElementById(id);
 const KEY = 'am_token';
 let TOK = localStorage.getItem(KEY) || '';
-let AGENTS = [], TASKS = [], RULES = [];
+let AGENTS = [], TASKS = [], RULES = [], BOARDS = [], BOARD = null;
+const params = new URLSearchParams(location.search);
+let CHAT = params.get('chat') || 'peers';
 
 async function api(path, opts={}){
   const r = await fetch(path, {
@@ -200,22 +239,78 @@ async function boot(){
 }
 
 async function refresh(){
-  const [a, t, r] = await Promise.all([
+  const [a, boards, board] = await Promise.all([
     api('/api/roster/agents'),
-    api('/api/roster/tasks'),
-    api('/api/roster/rules'),
+    api('/api/roster/boards'),
+    api('/api/roster/board?chat=' + encodeURIComponent(CHAT)),
   ]);
   AGENTS = a.agents || [];
+  BOARDS = boards.boards || [];
+  BOARD = board;
+  CHAT = board.chat || CHAT;
+  const q = 'chat=' + encodeURIComponent(CHAT);
+  const [t, r] = await Promise.all([
+    api('/api/roster/tasks?' + q),
+    api('/api/roster/rules?' + q),
+  ]);
   TASKS = t.tasks || [];
   RULES = r.rules || [];
+  renderBoards();
+  renderMembers();
   renderAgents();
   renderTasks();
   renderRules();
+  const members = BOARD.members || [];
   const sel = $('task-assignee');
   const cur = sel.value;
   sel.innerHTML = '<option value="">auto</option>' +
-    AGENTS.map(x => `<option value="${x.name}">${x.label}</option>`).join('');
+    members.map(x => `<option value="${x.agent}">${esc(x.label)}</option>`).join('');
   sel.value = cur;
+  const msel = $('member-agent');
+  const onBoard = new Set(members.map(m => m.agent));
+  msel.innerHTML = AGENTS.filter(x => !onBoard.has(x.name))
+    .map(x => `<option value="${x.name}">${esc(x.label)}</option>`).join('')
+    || '<option value="">—</option>';
+  $('board-link').innerHTML =
+    `Linked to inbox <a href="/inbox/">chat</a> <code>${esc(CHAT)}</code>` +
+    ` · ${BOARD.open_tasks || 0} open`;
+}
+
+function renderBoards(){
+  const sel = $('board-sel');
+  const chats = new Set(BOARDS.map(b => b.chat));
+  if(!chats.has(CHAT)) BOARDS = [...BOARDS, BOARD].filter(Boolean);
+  sel.innerHTML = BOARDS.map(b =>
+    `<option value="${esc(b.chat)}" ${b.chat===CHAT?'selected':''}>${esc(b.title || b.chat)}</option>`
+  ).join('');
+}
+
+function renderMembers(){
+  const members = (BOARD && BOARD.members) || [];
+  if(!members.length){
+    $('member-rows').innerHTML = '<tr><td colspan="3" class="hint">No members.</td></tr>';
+    return;
+  }
+  $('member-rows').innerHTML = members.map(m =>
+    `<tr>
+      <td><span class="name">${esc(m.label)}</span>
+        <div class="hint" style="margin:0">${esc(m.agent)}</div></td>
+      <td><span class="pill on">${esc(m.role)}</span></td>
+      <td style="text-align:right">
+        <button type="button" class="btn ghost" data-rm="${esc(m.agent)}">Remove</button>
+      </td>
+    </tr>`
+  ).join('');
+  $('member-rows').querySelectorAll('[data-rm]').forEach(b => {
+    b.onclick = async () => {
+      if(!confirm('Remove '+b.dataset.rm+'?')) return;
+      try {
+        await api('/api/roster/board/members/remove', {
+          method:'POST', body: JSON.stringify({chat: CHAT, agent: b.dataset.rm})});
+        await refresh();
+      } catch(e){ alert(e.message); }
+    };
+  });
 }
 
 function renderAgents(){
@@ -271,12 +366,14 @@ function renderTasks(){
 }
 
 function renderRules(){
+  const members = (BOARD && BOARD.members) || [];
+  const opts = members.length ? members : AGENTS.map(a => ({agent:a.name, label:a.label}));
   $('rules').innerHTML = RULES.map((r,i) =>
     `<div class="row rule" data-i="${i}" style="margin-bottom:8px">
       <div class="field"><label>Match</label><input class="r-match" value="${esc(r.match)}"></div>
       <div class="field"><label>Agent</label>
-        <select class="r-agent">${AGENTS.map(a =>
-          `<option value="${a.name}" ${a.name===r.agent?'selected':''}>${a.label}</option>`).join('')}</select>
+        <select class="r-agent">${opts.map(a =>
+          `<option value="${a.agent || a.name}" ${(a.agent||a.name)===r.agent?'selected':''}>${esc(a.label)}</option>`).join('')}</select>
       </div>
       <div class="field" style="flex:0 0 auto"><label><input type="checkbox" class="r-par" ${r.parallel?'checked':''}> ∥</label></div>
       <button type="button" class="btn ghost r-del">×</button>
@@ -311,6 +408,29 @@ $('btn-key-dismiss').onclick = () => {
 };
 $('btn-copy-key').onclick = ev => copy($('key-tok').textContent, ev.currentTarget);
 
+$('board-sel').onchange = async () => {
+  CHAT = $('board-sel').value;
+  history.replaceState(null, '', '?chat=' + encodeURIComponent(CHAT));
+  await refresh();
+};
+$('btn-new-board').onclick = async () => {
+  const chat = $('new-chat').value.trim();
+  if(!chat) return;
+  await api('/api/roster/boards', {method:'POST', body: JSON.stringify({chat})});
+  CHAT = chat;
+  $('new-chat').value = '';
+  history.replaceState(null, '', '?chat=' + encodeURIComponent(CHAT));
+  await refresh();
+};
+$('btn-add-member').onclick = async () => {
+  const agent = $('member-agent').value;
+  if(!agent) return;
+  await api('/api/roster/board/members', {method:'POST', body: JSON.stringify({
+    chat: CHAT, agent, role: $('member-role').value,
+  })});
+  await refresh();
+};
+
 $('btn-add-agent').onclick = async () => {
   const name = $('new-agent').value.trim();
   if(!name) return;
@@ -322,18 +442,23 @@ $('btn-add-agent').onclick = async () => {
 $('btn-add-task').onclick = async () => {
   const title = $('task-title').value.trim();
   if(!title) return;
-  await api('/api/roster/tasks', {method:'POST', body: JSON.stringify({
-    title,
-    assignee: $('task-assignee').value,
-    parallel: $('task-parallel').checked,
-    created_by: 'you',
-  })});
-  $('task-title').value = '';
-  await refresh();
+  try {
+    await api('/api/roster/tasks', {method:'POST', body: JSON.stringify({
+      title,
+      chat: CHAT,
+      assignee: $('task-assignee').value,
+      parallel: $('task-parallel').checked,
+      created_by: 'you',
+    })});
+    $('task-title').value = '';
+    await refresh();
+  } catch(e){ alert(e.message); }
 };
 
 $('btn-add-rule').onclick = () => {
-  RULES.push({match:'', agent: AGENTS[0]?.name || 'hermes', parallel:false, priority:0});
+  const members = (BOARD && BOARD.members) || [];
+  RULES.push({match:'', agent: members[0]?.agent || AGENTS[0]?.name || 'hermes',
+              parallel:false, priority:0});
   renderRules();
 };
 $('btn-save-rules').onclick = async () => {
@@ -342,7 +467,7 @@ $('btn-save-rules').onclick = async () => {
     agent: el.querySelector('.r-agent').value,
     parallel: el.querySelector('.r-par').checked,
   })).filter(r => r.match);
-  await api('/api/roster/rules', {method:'POST', body: JSON.stringify({rules})});
+  await api('/api/roster/rules', {method:'POST', body: JSON.stringify({rules, chat: CHAT})});
   await refresh();
 };
 

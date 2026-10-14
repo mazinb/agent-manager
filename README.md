@@ -90,6 +90,14 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — Task boards **linked to inbox chats**: each board has
+  members (access); claim/assign requires membership. Agents UI picks a
+  chat; Inbox shows a board strip. MCP `list_boards` / `get_board` /
+  `add_board_member`. Default chat `peers`. Docs: `docs/AGENTS-BOARD.md`.
+- **2026-10-15** — **Agents** board (`/agents/`): roster with per-agent
+  keys, shared cross-project tasks, routing rules (match → agent,
+  parallel/serial). MCP `list_roster` / `add_task` / `claim_task`. Docs:
+  `docs/AGENTS-BOARD.md`.
 - **2026-10-15** — Connect UX: fixed (non-editable) brain URL, create /
   view-once token, agent grid + custom add. Commands redact the token on
   screen; copy/deeplink still carry it. Shorter edge cache so phones update.

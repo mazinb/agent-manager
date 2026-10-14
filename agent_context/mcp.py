@@ -320,21 +320,44 @@ TOOLS = [
     {"name": "list_roster", "description": "Cross-project agent table "
      "(hermes, cursor, grok-bot, …) with key + parallel flags.",
      "inputSchema": {"type": "object", "properties": {}}},
-    {"name": "list_tasks", "description": "Shared task board (not repo-scoped). "
-     "Filter by status / assignee.",
+    {"name": "list_boards", "description": "Task boards linked to inbox chats. "
+     "Each board has members who may claim work.",
+     "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "get_board", "description": "Get (or create) the board for an "
+     "inbox chat slug. Defaults to chat=peers.",
+     "inputSchema": {"type": "object", "properties": {
+         "chat": {"type": "string"}, "board_id": {"type": "integer"}}}},
+    {"name": "add_board_member", "description": "Give an agent access to a "
+     "board (role: member|worker|admin). Required before they can claim.",
+     "inputSchema": {"type": "object", "properties": {
+         "chat": {"type": "string"}, "board_id": {"type": "integer"},
+         "agent": {"type": "string"},
+         "role": {"type": "string", "default": "worker"}},
+         "required": ["agent"]}},
+    {"name": "remove_board_member", "description": "Remove an agent's access "
+     "from a board.",
+     "inputSchema": {"type": "object", "properties": {
+         "chat": {"type": "string"}, "board_id": {"type": "integer"},
+         "agent": {"type": "string"}},
+         "required": ["agent"]}},
+    {"name": "list_tasks", "description": "Tasks on a chat-linked board. "
+     "Filter by status / assignee / chat (default peers).",
      "inputSchema": {"type": "object", "properties": {
          "status": {"type": "string"}, "assignee": {"type": "string"},
+         "chat": {"type": "string"}, "board_id": {"type": "integer"},
          "limit": {"type": "integer", "default": 50}}}},
-    {"name": "add_task", "description": "Add a shared task. Rules auto-route "
-     "assignee when omitted (e.g. 'on-device' → hermes).",
+    {"name": "add_task", "description": "Add a task on a board (chat slug). "
+     "Rules auto-route assignee when omitted. Assignee must be a member.",
      "inputSchema": {"type": "object", "properties": {
          "title": {"type": "string"}, "body": {"type": "string"},
          "assignee": {"type": "string"},
          "parallel": {"type": "boolean"},
+         "chat": {"type": "string"},
+         "board_id": {"type": "integer"},
          "created_by": {"type": "string"}},
          "required": ["title"]}},
-    {"name": "claim_task", "description": "Claim an open task for an agent. "
-     "Fails if the agent already holds a serial (non-parallel) task.",
+    {"name": "claim_task", "description": "Claim an open task. Agent must be "
+     "a board member. Fails if they already hold a serial task.",
      "inputSchema": {"type": "object", "properties": {
          "id": {"type": "integer"}, "agent": {"type": "string"}},
          "required": ["id", "agent"]}},
@@ -352,21 +375,62 @@ def _list_roster(brain, args):
     return {"agents": roster.list_agents(brain.con)}
 
 
+def _list_boards(brain, args):
+    from . import roster
+    return {"boards": roster.list_boards(brain.con)}
+
+
+def _get_board(brain, args):
+    from . import roster
+    bid = args.get("board_id")
+    return roster.get_board(
+        brain.con, chat=args.get("chat"),
+        board_id=int(bid) if bid not in (None, "") else None)
+
+
+def _add_board_member(brain, args):
+    from . import roster
+    bid = args.get("board_id")
+    return roster.add_member(
+        brain.con,
+        board_id=int(bid) if bid not in (None, "") else None,
+        chat=args.get("chat"),
+        agent=args.get("agent") or "",
+        role=args.get("role") or "worker")
+
+
+def _remove_board_member(brain, args):
+    from . import roster
+    bid = args.get("board_id")
+    return roster.remove_member(
+        brain.con,
+        board_id=int(bid) if bid not in (None, "") else None,
+        chat=args.get("chat"),
+        agent=args.get("agent") or "")
+
+
 def _list_tasks(brain, args):
     from . import roster
+    bid = args.get("board_id")
     return {"tasks": roster.list_tasks(
         brain.con, status=args.get("status"),
-        assignee=args.get("assignee"), limit=args.get("limit", 50))}
+        assignee=args.get("assignee"),
+        chat=args.get("chat"),
+        board_id=int(bid) if bid not in (None, "") else None,
+        limit=args.get("limit", 50))}
 
 
 def _add_task(brain, args):
     from . import roster
+    bid = args.get("board_id")
     return roster.add_task(
         brain.con, title=args.get("title") or "",
         body=args.get("body") or "",
         assignee=args.get("assignee") or "",
         parallel=args.get("parallel"),
-        created_by=args.get("created_by") or "mcp")
+        created_by=args.get("created_by") or "mcp",
+        chat=args.get("chat"),
+        board_id=int(bid) if bid not in (None, "") else None)
 
 
 def _claim_task(brain, args):
@@ -388,7 +452,9 @@ TOOL_FUNCS = {t["name"]: f for t, f in zip(
             _add_note, _list_projects, _get_project_summary,
             _refresh_project_summary, _get_autonote_config,
             _set_autonote_config, _message_peer, _peer_inbox,
-            _list_roster, _list_tasks, _add_task, _claim_task, _update_task])}
+            _list_roster, _list_boards, _get_board, _add_board_member,
+            _remove_board_member, _list_tasks, _add_task, _claim_task,
+            _update_task])}
 
 
 def handle(brain, msg):
