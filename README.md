@@ -49,6 +49,12 @@ npx --yes agent-manager-brain serve
 
 Full platform steps: **[docs/CONNECT.md](docs/CONNECT.md)**.
 
+## Changelog
+
+- **2026-10-14** — Brain page visual restyle: plain list rows with dividers, no
+  emoji, monospace identifiers, markdown rendering in Mentions/Ask, additive
+  `mentions` count in `GET /api/entities`. Deployed to main; service restarted.
+
 ## Self-host (Python)
 
 ```bash
