@@ -81,9 +81,11 @@ def upsert_source(con, path, kind, project, mtime, size, text_chunks):
 
 
 def prune_stale(con, live_paths):
-    """Delete sources no longer on disk."""
-    rows = con.execute("SELECT id, path FROM sources").fetchall()
-    gone = [r["id"] for r in rows if r["path"] not in live_paths]
+    """Delete sources no longer on disk. Notes (kind='note') never live on
+    disk — they are agent-written rows — so they are always protected."""
+    rows = con.execute("SELECT id, path, kind FROM sources").fetchall()
+    gone = [r["id"] for r in rows
+            if r["kind"] != "note" and r["path"] not in live_paths]
     for sid in gone:
         con.execute("DELETE FROM chunks WHERE source_id=?", (sid,))
         con.execute("DELETE FROM sources WHERE id=?", (sid,))
