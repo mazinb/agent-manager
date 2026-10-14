@@ -299,5 +299,72 @@ class Chunk5ProjectVisibility(unittest.TestCase):
         self.assertIn("alpha secret", pack)
 
 
+class DemoNoteShowcase(unittest.TestCase):
+    """The demo-note flow from the 2026-10-14 UI screenshot, end to end:
+    a confidence-badged note ranks in results, a stale note is excluded,
+    and a public project's readme rides along."""
+
+    def _seed(self):
+        import types
+        from agent_context import mcp
+        con = fresh_con()
+        brain = types.SimpleNamespace(con=con)
+        # public project with a readme — allowed to ride along
+        store.upsert_source(con, "pub.md", "project_readme", "pubproj", 1, 10,
+                            [("README", "pubproj deploy checklist keyword")])
+        store.set_project_visibility(con, "pubproj", "public")
+        # fresh demo note via the real note tool, with trust metadata
+        mcp._note(brain, {
+            "project": "demo",
+            "title": "Demo — deploy checklist",
+            "body": "Deploy steps for the demo service.",
+            "confidence": 0.92,
+            "sources": ["scripts/deploy.sh"],
+        })
+        # outdated demo note, flagged stale after its based-on source changed
+        mcp._note(brain, {
+            "project": "demo",
+            "title": "Demo — benchmark results (outdated)",
+            "body": "Latency bench from the old hardware.",
+            "confidence": 0.55,
+            "sources": ["bench/old-results.json"],
+        })
+        store.flag_stale_for_sources(con, {"bench/old-results.json"})
+        con.commit()
+        return con
+
+    def test_fresh_demo_note_badged_in_results(self):
+        from agent_context import query
+        con = self._seed()
+        hits = query.search(con, "deploy checklist", project="demo")
+        note = [r for r in hits if r["path"].startswith("note:demo/")]
+        self.assertEqual(len(note), 1)
+        self.assertEqual(note[0]["confidence"], 0.92)
+        self.assertGreater(note[0]["verified_at"], 0)
+        self.assertEqual(note[0]["stale"], 0)
+        # the public readme rides along in the same result set
+        self.assertIn("pubproj", {r["project"] for r in hits})
+
+    def test_stale_demo_note_excluded(self):
+        from agent_context import query
+        con = self._seed()
+        row = con.execute(
+            "SELECT stale FROM sources WHERE path LIKE 'note:demo/%outdated%'"
+        ).fetchone()
+        self.assertEqual(row["stale"], 1, "stale flag not set")
+        hits = query.search(con, "deploy checklist", project="demo")
+        self.assertNotIn(
+            "note:demo/Demo — benchmark results (outdated)",
+            {r["path"] for r in hits})
+
+    def test_pack_keeps_fresh_note_drops_stale(self):
+        from agent_context import query
+        con = self._seed()
+        pack = query.context_pack(con, "demo")
+        self.assertIn("Deploy steps for the demo service.", pack)
+        self.assertNotIn("Latency bench from the old hardware.", pack)
+        self.assertIn("pubproj deploy checklist keyword", pack)
+
+
 if __name__ == "__main__":
     unittest.main()
