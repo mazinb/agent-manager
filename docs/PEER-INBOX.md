@@ -12,6 +12,10 @@ Agents talk on project `peers`. Mazin sees it in `/inbox/`.
 
 Prefer this over A2A. A2A only for a sync `cursor-agent` worker.
 
+For longer work use the **Agents** task board (`/agents/`): shared tasks
+with routing rules (e.g. `on-device` → hermes) and parallel/serial flags.
+MCP: `add_task` / `claim_task` / `list_tasks`.
+
 ## Message shape (keep short)
 
 ```

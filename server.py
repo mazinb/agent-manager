@@ -4,7 +4,7 @@
 One process on :8075:
   /                 Public landing
   /setup/           Token onboarding (alias: /inbox/ — inbox UI once logged in)
-  /connect/         One-click MCP connect docs
+  /agents/          Agent roster + shared tasks (alias: /connect/)
   /brain/           Shared brain UI
   /api/*            JSON API (token)
   /mcp              Streamable HTTP MCP (token on POST)
@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
 from agent_context import github_login, llm, mcp, query, store  # noqa: E402
-from agent_context import autonote  # noqa: E402
+from agent_context import autonote, roster  # noqa: E402
 from agent_context.server import Brain  # noqa: E402
 
 STATIC = os.path.join(ROOT, "static")
@@ -183,6 +183,12 @@ def token_ok(token: str) -> bool:
     for row in load_tokens():
         if secrets.compare_digest(row.get("hash", ""), digest):
             return True
+    # Per-agent keys (roster)
+    try:
+        if store.roster_token_ok(BRAIN.con, token):
+            return True
+    except Exception:
+        pass
     return False
 
 
@@ -266,12 +272,6 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if path in ("/agents", "/agents/") or path.startswith("/agents/"):
-            self.send_response(301)
-            self.send_header("Location", "/brain/")
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-            return
         if path in ("/space", "/space/") or path.startswith("/space/"):
             return self._json(410, {"error": "gone"})
 
@@ -288,9 +288,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._file(os.path.join(STATIC, "setup.html"),
                               "text/html; charset=utf-8",
                               cache="public, max-age=60, s-maxage=300")
-        if path in ("/connect", "/connect/"):
-            # Static shell; short edge TTL so UI deploys show up on phones.
-            return self._file(os.path.join(STATIC, "connect.html"),
+        if path in ("/agents", "/agents/", "/connect", "/connect/"):
+            return self._file(os.path.join(STATIC, "agents.html"),
                               "text/html; charset=utf-8",
                               cache="public, max-age=60, s-maxage=120")
         if path in ("/brain", "/brain/"):
@@ -367,6 +366,16 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/inbox/agents":
             return self._json(200,
                               {"agents": store.list_agents(BRAIN.con)})
+        if path == "/api/roster/agents":
+            return self._json(200, {"agents": roster.list_agents(BRAIN.con)})
+        if path == "/api/roster/tasks":
+            return self._json(200, {"tasks": roster.list_tasks(
+                BRAIN.con,
+                status=(q.get("status") or [None])[0],
+                assignee=(q.get("assignee") or [None])[0],
+                limit=int((q.get("limit") or ["100"])[0]))})
+        if path == "/api/roster/rules":
+            return self._json(200, {"rules": roster.list_rules(BRAIN.con)})
         if path == "/api/inbox/messages":
             to_agent = (q.get("to") or q.get("to_agent") or [None])[0]
             agent = (q.get("from") or q.get("agent") or [None])[0]
@@ -480,6 +489,9 @@ class Handler(BaseHTTPRequestHandler):
         if path not in (
             "/api/ask", "/api/refresh", "/api/note",
             "/api/project/visibility", "/mcp",
+            "/api/roster/agents", "/api/roster/agents/key",
+            "/api/roster/tasks", "/api/roster/tasks/claim",
+            "/api/roster/tasks/update", "/api/roster/rules",
         ):
             return self._json(404, {"error": "not found"})
         if not self._authed():
@@ -489,6 +501,57 @@ class Handler(BaseHTTPRequestHandler):
             payload = self._read_json()
         except Exception:
             return self._json(400, {"error": "bad json"})
+
+        if path == "/api/roster/agents":
+            try:
+                return self._json(200, roster.upsert_agent(
+                    BRAIN.con, payload.get("name") or "",
+                    label=payload.get("label"),
+                    parallel_ok=payload.get("parallel_ok")))
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/agents/key":
+            try:
+                return self._json(201, roster.mint_agent_key(
+                    BRAIN.con, payload.get("name") or ""))
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/tasks":
+            try:
+                return self._json(201, roster.add_task(
+                    BRAIN.con,
+                    title=payload.get("title") or "",
+                    body=payload.get("body") or "",
+                    assignee=payload.get("assignee") or "",
+                    parallel=payload.get("parallel"),
+                    created_by=payload.get("created_by") or "you",
+                    auto_route=payload.get("auto_route", True)))
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/tasks/claim":
+            try:
+                return self._json(200, roster.claim_task(
+                    BRAIN.con, int(payload.get("id") or 0),
+                    payload.get("agent") or ""))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/tasks/update":
+            try:
+                return self._json(200, roster.update_task(
+                    BRAIN.con, int(payload.get("id") or 0),
+                    status=payload.get("status"),
+                    assignee=payload.get("assignee"),
+                    parallel=payload.get("parallel"),
+                    title=payload.get("title"),
+                    body=payload.get("body")))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/rules":
+            try:
+                return self._json(200, {
+                    "rules": roster.set_rules(BRAIN.con, payload.get("rules") or [])})
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
 
         if path == "/mcp":
             # ?project=X on the MCP URL pins a default project for search/ask

@@ -11,7 +11,7 @@
   <a class="brand" href="/">Zoro</a>
   <nav>
     <a href="/inbox/">Inbox</a>
-    <a href="/connect/">Connect</a>
+    <a href="/agents/">Agents</a>
     <a href="/brain/">Brain</a>
   </nav>
 </header>
@@ -19,7 +19,7 @@
   <h1 class="hero">Zoro</h1>
   <p class="sub" id="status">Shared brain for agents.</p>
   <div class="actions">
-    <a class="btn primary" href="/connect/">Connect</a>
+    <a class="btn primary" href="/agents/">Agents</a>
     <a class="btn ghost" href="/inbox/">Inbox</a>
   </div>
 </main>
@@ -29,8 +29,8 @@ async function boot(){
   try{
     const s = await fetch('/api/setup/status').then(r=>r.json());
     if(s.bootstrap || s.signup_open)
-      $('status').innerHTML = 'Get a token on <a href="/connect/">Connect</a>.';
-    else $('status').textContent = 'Self-host or open Connect.';
+      $('status').innerHTML = 'Get a token on <a href="/agents/">Agents</a>.';
+    else $('status').textContent = 'Self-host or open Agents.';
   }catch{ $('status').textContent = 'Offline.'; }
 }
 boot();

@@ -14,7 +14,7 @@ Self-hosted. Stdlib-only Python. One process.
 |---|---|
 | [`/`](https://bot.getzoro.com/) | Public landing |
 | [`/inbox/`](https://bot.getzoro.com/inbox/) | Inbox (token onboarding if needed; `/setup/` still works) |
-| [`/connect/`](https://bot.getzoro.com/connect/) | One-click MCP setup |
+| [`/agents/`](https://bot.getzoro.com/agents/) | Agent roster + shared tasks (`/connect/` alias) |
 | `/brain/` | Ask / entities / context packs |
 | `/mcp` | Streamable HTTP MCP |
 | `/api/*` | JSON API |

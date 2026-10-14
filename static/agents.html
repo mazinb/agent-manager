@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agents — Zoro</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#e6edf3;
+  --dim:#8b949e; --faint:#6e7681; --acc:#58a6ff; --acc-dim:#58a6ff33;
+  --ok:#3fb950; --warn:#d29922; --chrome-h:48px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.45 ui-sans-serif,system-ui,sans-serif}
+a{color:var(--acc);text-decoration:none}
+code{font:12.5px/1.4 ui-monospace,Menlo,monospace}
+
+.top{display:flex;align-items:center;gap:10px;height:var(--chrome-h);
+  padding:0 14px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30;
+  background:#0d1117f5;backdrop-filter:blur(10px)}
+.top .brand{font-size:15px;font-weight:700;letter-spacing:-.02em;color:var(--fg)}
+.top .brand:hover{color:var(--acc)}
+.top nav{margin-left:auto;display:flex;gap:2px}
+.top nav a{color:var(--dim);font-size:13px;padding:6px 10px;border-radius:8px}
+.top nav a:hover{color:var(--fg);background:#21262d}
+.top nav a.on{color:var(--acc);background:var(--acc-dim)}
+
+.wrap{max-width:720px;margin:0 auto;padding:20px 16px 72px}
+.hero{font-size:clamp(22px,4vw,28px);margin:0 0 6px;letter-spacing:-.02em;font-weight:650}
+.sub{color:var(--dim);margin:0 0 16px;font-size:14px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;margin:0 0 12px}
+.card h2{margin:0 0 10px;font-size:15px;font-weight:600}
+.hint{font-size:12px;color:var(--dim);margin:8px 0 0}
+.warn{color:var(--warn)}.okmsg{color:var(--ok)}.hidden{display:none!important}
+
+.btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;
+  gap:6px;padding:8px 12px;border-radius:8px;font-weight:600;font-size:13px;
+  border:1px solid transparent;cursor:pointer;font-family:inherit;color:inherit;background:none}
+.btn.primary{background:var(--acc);color:#04121f}
+.btn.ghost{background:#0d1117;color:var(--fg);border-color:var(--border)}
+.btn.ghost:hover{border-color:#484f58}
+.btn.ok{background:var(--ok);color:#04120a}
+.btn:disabled{opacity:.45;cursor:default}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+
+input,select,textarea{width:100%;background:#0d1117;border:1px solid var(--border);
+  color:var(--fg);border-radius:8px;padding:9px 11px;font:inherit}
+label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.field{flex:1;min-width:120px}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;
+  text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:10px 8px;border-bottom:1px solid #21262d;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.name{font-weight:650;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+.pill{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px;
+  background:#21262d;color:var(--dim)}
+.pill.on{background:#1d3a2a;color:#7fd6a4}
+.pill.serial{background:#3a2a1d;color:#e3b341}
+.pill.open{background:#243044;color:#9fb4d4}
+.pill.claimed{background:#2b2436;color:#c9a7f5}
+.pill.done{background:#1d3a2a;color:#7fd6a4}
+.pill.blocked{background:#3a1d1d;color:#f58f7f}
+
+.reveal{background:#0d1117;border:1px solid var(--warn);border-radius:10px;padding:12px;margin-top:10px}
+.reveal .tok{font:13px/1.4 ui-monospace,Menlo,monospace;word-break:break-all;margin:0 0 8px}
+
+@media (max-width:640px){
+  .top{padding:0 10px}
+  .wrap{padding:16px 12px 64px}
+  .hide-sm{display:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">Zoro</a>
+  <nav>
+    <a href="/inbox/">Inbox</a>
+    <a class="on" href="/agents/">Agents</a>
+    <a href="/brain/">Brain</a>
+  </nav>
+</header>
+<main class="wrap">
+  <h1 class="hero">Agents</h1>
+  <p class="sub">Shared tasks across Hermes, Grok, Cursor — not tied to one repo.</p>
+
+  <div class="card" id="gate">
+    <h2>Token</h2>
+    <p class="hint" id="gate-hint">Needed to manage agents.</p>
+    <div class="actions">
+      <button type="button" class="btn primary" id="btn-create">Create</button>
+      <button type="button" class="btn ghost" id="btn-paste-toggle">Paste</button>
+    </div>
+    <div id="paste-box" class="hidden" style="margin-top:10px">
+      <input id="paste" type="password" placeholder="Paste token">
+      <div class="actions"><button type="button" class="btn primary" id="btn-save-paste">Save</button></div>
+    </div>
+    <div id="once" class="reveal hidden">
+      <p class="warn" style="margin:0 0 6px;font-size:12px">Copy now — once.</p>
+      <div class="tok" id="once-tok"></div>
+      <div class="actions">
+        <button type="button" class="btn primary" id="btn-copy-tok">Copy</button>
+        <button type="button" class="btn ghost" id="btn-dismiss">Saved</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="card">
+      <h2>Roster</h2>
+      <table>
+        <thead><tr><th>Agent</th><th>Key</th><th>Mode</th><th></th></tr></thead>
+        <tbody id="agent-rows"></tbody>
+      </table>
+      <div class="row" style="margin-top:12px">
+        <div class="field"><label>Name</label><input id="new-agent" placeholder="e.g. travel-helper"></div>
+        <button type="button" class="btn primary" id="btn-add-agent">Add</button>
+      </div>
+      <div id="key-once" class="reveal hidden">
+        <p class="warn" style="margin:0 0 6px;font-size:12px">Key for <span id="key-agent"></span> — once.</p>
+        <div class="tok" id="key-tok"></div>
+        <div class="actions">
+          <button type="button" class="btn primary" id="btn-copy-key">Copy</button>
+          <button type="button" class="btn ghost" id="btn-key-dismiss">Saved</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Tasks</h2>
+      <table>
+        <thead><tr><th>Task</th><th>Who</th><th>Mode</th><th>Status</th><th></th></tr></thead>
+        <tbody id="task-rows"></tbody>
+      </table>
+      <div class="row" style="margin-top:12px">
+        <div class="field" style="flex:2"><label>Title</label><input id="task-title" placeholder="on-device: …"></div>
+        <div class="field"><label>Assign</label>
+          <select id="task-assignee"><option value="">auto</option></select>
+        </div>
+        <div class="field" style="flex:0 0 auto">
+          <label><input type="checkbox" id="task-parallel"> Parallel</label>
+        </div>
+        <button type="button" class="btn primary" id="btn-add-task">Add</button>
+      </div>
+      <p class="hint">Leave assign empty to use rules (e.g. “on-device” → hermes).</p>
+    </div>
+
+    <div class="card">
+      <h2>Rules</h2>
+      <p class="hint" style="margin:0 0 10px">Match text → agent. First match wins.</p>
+      <div id="rules"></div>
+      <div class="actions">
+        <button type="button" class="btn ghost" id="btn-add-rule">Add rule</button>
+        <button type="button" class="btn primary" id="btn-save-rules">Save</button>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const KEY = 'am_token';
+let TOK = localStorage.getItem(KEY) || '';
+let AGENTS = [], TASKS = [], RULES = [];
+
+async function api(path, opts={}){
+  const r = await fetch(path, {
+    ...opts,
+    headers: {'X-Token': TOK, 'Content-Type':'application/json', ...(opts.headers||{})},
+  });
+  const d = await r.json().catch(()=>({}));
+  if(r.status === 401) throw new Error('unauthorized');
+  if(!r.ok) throw new Error(d.error || ('HTTP '+r.status));
+  return d;
+}
+
+async function copy(text, btn){
+  await navigator.clipboard.writeText(text);
+  const o = btn.textContent; btn.textContent = 'Copied'; btn.classList.add('ok');
+  setTimeout(() => { btn.textContent = o; btn.classList.remove('ok'); }, 1000);
+}
+
+function showApp(on){
+  $('gate').classList.toggle('hidden', on);
+  $('app').classList.toggle('hidden', !on);
+}
+
+async function boot(){
+  if(!TOK){ showApp(false); return; }
+  try {
+    await refresh();
+    showApp(true);
+  } catch {
+    showApp(false);
+  }
+}
+
+async function refresh(){
+  const [a, t, r] = await Promise.all([
+    api('/api/roster/agents'),
+    api('/api/roster/tasks'),
+    api('/api/roster/rules'),
+  ]);
+  AGENTS = a.agents || [];
+  TASKS = t.tasks || [];
+  RULES = r.rules || [];
+  renderAgents();
+  renderTasks();
+  renderRules();
+  const sel = $('task-assignee');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">auto</option>' +
+    AGENTS.map(x => `<option value="${x.name}">${x.label}</option>`).join('');
+  sel.value = cur;
+}
+
+function renderAgents(){
+  $('agent-rows').innerHTML = AGENTS.map(a =>
+    `<tr>
+      <td><span class="name">${esc(a.label)}</span><div class="hint" style="margin:0">${esc(a.name)}</div></td>
+      <td>${a.has_key ? '<span class="pill on">••••'+esc(a.token_hint)+'</span>' : '<span class="pill">none</span>'}</td>
+      <td><span class="pill ${a.parallel_ok?'on':'serial'}">${a.parallel_ok?'parallel':'serial'}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        <button type="button" class="btn ghost" data-key="${esc(a.name)}">Key</button>
+      </td>
+    </tr>`
+  ).join('');
+  $('agent-rows').querySelectorAll('[data-key]').forEach(b => {
+    b.onclick = () => mintKey(b.dataset.key);
+  });
+}
+
+function renderTasks(){
+  if(!TASKS.length){
+    $('task-rows').innerHTML = '<tr><td colspan="5" class="hint">No tasks.</td></tr>';
+    return;
+  }
+  $('task-rows').innerHTML = TASKS.map(t =>
+    `<tr>
+      <td><div class="name" style="font-family:inherit;font-weight:600">${esc(t.title)}</div>
+        ${t.body ? `<div class="hint" style="margin:2px 0 0">${esc(t.body.slice(0,80))}</div>` : ''}</td>
+      <td class="name">${esc(t.assignee || '—')}</td>
+      <td><span class="pill ${t.parallel?'on':'serial'}">${t.parallel?'∥':'→'}</span></td>
+      <td><span class="pill ${esc(t.status)}">${esc(t.status)}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        ${t.status==='open'||t.status==='blocked'
+          ? `<button type="button" class="btn ghost" data-claim="${t.id}">Claim</button>` : ''}
+        ${t.status==='claimed'
+          ? `<button type="button" class="btn ghost" data-done="${t.id}">Done</button>` : ''}
+      </td>
+    </tr>`
+  ).join('');
+  $('task-rows').querySelectorAll('[data-claim]').forEach(b => {
+    b.onclick = async () => {
+      const agent = prompt('Claim as agent', 'hermes');
+      if(!agent) return;
+      try { await api('/api/roster/tasks/claim', {method:'POST', body: JSON.stringify({id:+b.dataset.claim, agent})}); await refresh(); }
+      catch(e){ alert(e.message); }
+    };
+  });
+  $('task-rows').querySelectorAll('[data-done]').forEach(b => {
+    b.onclick = async () => {
+      await api('/api/roster/tasks/update', {method:'POST', body: JSON.stringify({id:+b.dataset.done, status:'done'})});
+      await refresh();
+    };
+  });
+}
+
+function renderRules(){
+  $('rules').innerHTML = RULES.map((r,i) =>
+    `<div class="row rule" data-i="${i}" style="margin-bottom:8px">
+      <div class="field"><label>Match</label><input class="r-match" value="${esc(r.match)}"></div>
+      <div class="field"><label>Agent</label>
+        <select class="r-agent">${AGENTS.map(a =>
+          `<option value="${a.name}" ${a.name===r.agent?'selected':''}>${a.label}</option>`).join('')}</select>
+      </div>
+      <div class="field" style="flex:0 0 auto"><label><input type="checkbox" class="r-par" ${r.parallel?'checked':''}> ∥</label></div>
+      <button type="button" class="btn ghost r-del">×</button>
+    </div>`
+  ).join('') || '<p class="hint">No rules.</p>';
+  $('rules').querySelectorAll('.r-del').forEach(b => {
+    b.onclick = () => {
+      const i = +b.closest('.rule').dataset.i;
+      RULES.splice(i, 1);
+      renderRules();
+    };
+  });
+}
+
+function esc(s){
+  return (s??'').toString().replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function mintKey(name){
+  if(!confirm('Mint new key for '+name+'? Old key stops working.')) return;
+  const d = await api('/api/roster/agents/key', {method:'POST', body: JSON.stringify({name})});
+  $('key-agent').textContent = name;
+  $('key-tok').textContent = d.token;
+  $('key-once').classList.remove('hidden');
+  await refresh();
+}
+
+$('btn-key-dismiss').onclick = () => {
+  $('key-once').classList.add('hidden');
+  $('key-tok').textContent = '';
+};
+$('btn-copy-key').onclick = ev => copy($('key-tok').textContent, ev.currentTarget);
+
+$('btn-add-agent').onclick = async () => {
+  const name = $('new-agent').value.trim();
+  if(!name) return;
+  await api('/api/roster/agents', {method:'POST', body: JSON.stringify({name})});
+  $('new-agent').value = '';
+  await refresh();
+};
+
+$('btn-add-task').onclick = async () => {
+  const title = $('task-title').value.trim();
+  if(!title) return;
+  await api('/api/roster/tasks', {method:'POST', body: JSON.stringify({
+    title,
+    assignee: $('task-assignee').value,
+    parallel: $('task-parallel').checked,
+    created_by: 'you',
+  })});
+  $('task-title').value = '';
+  await refresh();
+};
+
+$('btn-add-rule').onclick = () => {
+  RULES.push({match:'', agent: AGENTS[0]?.name || 'hermes', parallel:false, priority:0});
+  renderRules();
+};
+$('btn-save-rules').onclick = async () => {
+  const rules = [...$('rules').querySelectorAll('.rule')].map(el => ({
+    match: el.querySelector('.r-match').value.trim(),
+    agent: el.querySelector('.r-agent').value,
+    parallel: el.querySelector('.r-par').checked,
+  })).filter(r => r.match);
+  await api('/api/roster/rules', {method:'POST', body: JSON.stringify({rules})});
+  await refresh();
+};
+
+// gate
+$('btn-create').onclick = async () => {
+  const s = await fetch('/api/setup/status').then(r=>r.json());
+  const path = s.bootstrap ? '/api/setup/bootstrap' : '/api/setup/signup';
+  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({label:'agents'})});
+  const d = await r.json();
+  if(!r.ok){ alert(d.error||'failed'); return; }
+  TOK = d.token;
+  localStorage.setItem(KEY, TOK);
+  $('once-tok').textContent = TOK;
+  $('once').classList.remove('hidden');
+};
+$('btn-dismiss').onclick = async () => {
+  $('once').classList.add('hidden');
+  await boot();
+};
+$('btn-copy-tok').onclick = ev => copy($('once-tok').textContent, ev.currentTarget);
+$('btn-paste-toggle').onclick = () => $('paste-box').classList.toggle('hidden');
+$('btn-save-paste').onclick = async () => {
+  TOK = $('paste').value.trim();
+  if(!TOK) return;
+  localStorage.setItem(KEY, TOK);
+  await boot();
+};
+
+boot();
+</script>
+</body>
+</html>

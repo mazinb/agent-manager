@@ -100,7 +100,14 @@ def connect(db_path):
     con.execute("PRAGMA journal_mode=WAL")
     con.executescript(SCHEMA)
     _ensure_trust_columns(con)
+    from . import roster
+    roster.seed_if_needed(con)
     return con
+
+
+def roster_token_ok(con, token):
+    from . import roster
+    return bool(roster.agent_token_ok(con, token))
 
 
 def content_hash(text_chunks):

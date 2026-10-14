@@ -317,13 +317,78 @@ TOOLS = [
          "project": {"type": "string"},
          "limit": {"type": "integer", "default": 50}},
          "required": []}},
+    {"name": "list_roster", "description": "Cross-project agent table "
+     "(hermes, cursor, grok-bot, …) with key + parallel flags.",
+     "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "list_tasks", "description": "Shared task board (not repo-scoped). "
+     "Filter by status / assignee.",
+     "inputSchema": {"type": "object", "properties": {
+         "status": {"type": "string"}, "assignee": {"type": "string"},
+         "limit": {"type": "integer", "default": 50}}}},
+    {"name": "add_task", "description": "Add a shared task. Rules auto-route "
+     "assignee when omitted (e.g. 'on-device' → hermes).",
+     "inputSchema": {"type": "object", "properties": {
+         "title": {"type": "string"}, "body": {"type": "string"},
+         "assignee": {"type": "string"},
+         "parallel": {"type": "boolean"},
+         "created_by": {"type": "string"}},
+         "required": ["title"]}},
+    {"name": "claim_task", "description": "Claim an open task for an agent. "
+     "Fails if the agent already holds a serial (non-parallel) task.",
+     "inputSchema": {"type": "object", "properties": {
+         "id": {"type": "integer"}, "agent": {"type": "string"}},
+         "required": ["id", "agent"]}},
+    {"name": "update_task", "description": "Update task status/assignee "
+     "(status: open|claimed|done|blocked).",
+     "inputSchema": {"type": "object", "properties": {
+         "id": {"type": "integer"}, "status": {"type": "string"},
+         "assignee": {"type": "string"}, "parallel": {"type": "boolean"}},
+         "required": ["id"]}},
 ]
+
+
+def _list_roster(brain, args):
+    from . import roster
+    return {"agents": roster.list_agents(brain.con)}
+
+
+def _list_tasks(brain, args):
+    from . import roster
+    return {"tasks": roster.list_tasks(
+        brain.con, status=args.get("status"),
+        assignee=args.get("assignee"), limit=args.get("limit", 50))}
+
+
+def _add_task(brain, args):
+    from . import roster
+    return roster.add_task(
+        brain.con, title=args.get("title") or "",
+        body=args.get("body") or "",
+        assignee=args.get("assignee") or "",
+        parallel=args.get("parallel"),
+        created_by=args.get("created_by") or "mcp")
+
+
+def _claim_task(brain, args):
+    from . import roster
+    return roster.claim_task(brain.con, int(args.get("id") or 0),
+                             args.get("agent") or "")
+
+
+def _update_task(brain, args):
+    from . import roster
+    return roster.update_task(
+        brain.con, int(args.get("id") or 0),
+        status=args.get("status"), assignee=args.get("assignee"),
+        parallel=args.get("parallel"))
+
 
 TOOL_FUNCS = {t["name"]: f for t, f in zip(
     TOOLS, [_search, _ask, _entity, _context_pack, _projects, _stats, _note,
             _add_note, _list_projects, _get_project_summary,
             _refresh_project_summary, _get_autonote_config,
-            _set_autonote_config, _message_peer, _peer_inbox])}
+            _set_autonote_config, _message_peer, _peer_inbox,
+            _list_roster, _list_tasks, _add_task, _claim_task, _update_task])}
 
 
 def handle(brain, msg):
