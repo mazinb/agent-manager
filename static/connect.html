@@ -4,11 +4,74 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Connect — Agent Manager</title>
-<link rel="stylesheet" href="/static/app.css">
+<!-- Self-contained: no /static/app.css round-trip through the Spark tunnel. -->
 <style>
-.toolbar{display:flex;justify-content:flex-end;margin:0 0 8px}
-.copy{background:#21262d;color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
+:root{
+  --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#e6edf3;
+  --dim:#8b949e; --acc:#58a6ff; --acc-dim:#58a6ff33; --ok:#3fb950; --warn:#d29922;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.45 ui-sans-serif,system-ui,sans-serif}
+a{color:var(--acc);text-decoration:none}
+code,pre{font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
+
+.top{display:flex;align-items:center;gap:10px;padding:12px 16px;
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;
+  background:#0d1117f5;backdrop-filter:blur(10px)}
+.brand{font-size:15px;font-weight:650;color:var(--fg)}
+.brand:hover{color:var(--acc)}
+.top nav{margin-left:auto;display:flex;gap:2px}
+.top nav a{color:var(--dim);font-size:13px;padding:6px 10px;border-radius:8px}
+.top nav a:hover{color:var(--fg);background:#21262d}
+.top nav a.on{color:var(--acc);background:var(--acc-dim)}
+
+.wrap{max-width:640px;margin:0 auto;padding:22px 16px 72px}
+.hero{font-size:clamp(24px,5vw,32px);line-height:1.15;margin:0 0 8px;letter-spacing:-.02em}
+.sub{color:var(--dim);margin:0 0 18px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;margin:0 0 12px}
+.card h2{margin:0 0 10px;font-size:15px}
+label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
+input{width:100%;background:#0d1117;border:1px solid var(--border);color:var(--fg);
+  border-radius:8px;padding:10px 12px;font:inherit}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.field{flex:1;min-width:160px}
+.hint{font-size:12px;color:var(--dim);margin:8px 0 0}
+.okmsg{color:var(--ok)}.warn{color:var(--warn)}
+
+.cta{display:flex;flex-direction:column;gap:10px}
+.btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;
+  gap:8px;width:100%;padding:14px 16px;border-radius:10px;font-weight:700;
+  font-size:15px;border:1px solid transparent;cursor:pointer}
+.btn.primary{background:var(--acc);color:#04121f}
+.btn.primary:active{transform:translateY(1px)}
+.btn.primary.ok{background:var(--ok)}
+.btn.ghost{background:var(--panel);color:var(--fg);border-color:var(--border)}
+pre.cmd{margin:0;background:#0d1117;border:1px solid var(--border);border-radius:10px;
+  padding:12px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+
+details.more{margin-top:8px;border:1px solid var(--border);border-radius:12px;
+  background:var(--panel);overflow:hidden}
+details.more > summary{list-style:none;cursor:pointer;padding:12px 16px;
+  font-weight:600;font-size:14px;color:var(--fg);user-select:none}
+details.more > summary::-webkit-details-marker{display:none}
+details.more > summary::after{content:"Show";float:right;color:var(--dim);font-weight:500;font-size:12px}
+details.more[open] > summary::after{content:"Hide"}
+.agents{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px}
+.agents button{background:#0d1117;color:var(--fg);border:1px solid var(--border);
+  border-radius:999px;padding:7px 12px;font-size:13px;cursor:pointer}
+.agents button.on{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
+.agent-panel{padding:0 16px 16px}
+.agent-panel .toolbar{display:flex;justify-content:flex-end;margin:0 0 8px}
+.copy{background:#21262d;color:var(--fg);border:1px solid var(--border);
+  border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
 .copy.ok{border-color:var(--ok);color:var(--ok)}
+
+@media (max-width:640px){
+  .top{padding:10px 12px}
+  .wrap{padding:16px 12px 64px}
+}
 </style>
 </head>
 <body>
@@ -21,30 +84,44 @@
   </nav>
 </header>
 <main class="wrap">
-  <p class="sub" id="status"><a href="/setup/">Get a token</a> if you don’t have one.</p>
+  <h1 class="hero">One click to your agent</h1>
+  <p class="sub" id="status">Paste your token, then copy. No Spark round-trip — this page is static.</p>
 
   <div class="card">
     <div class="row">
       <div class="field">
-        <label for="base">URL</label>
-        <input id="base" placeholder="https://bot.getzoro.com">
+        <label for="base">Brain URL</label>
+        <input id="base" value="https://bot.getzoro.com" autocomplete="url" spellcheck="false">
       </div>
       <div class="field">
         <label for="token">Token</label>
-        <input id="token" type="password" placeholder="Access token" autocomplete="current-password">
+        <input id="token" type="password" placeholder="from /setup/" autocomplete="current-password" spellcheck="false">
       </div>
     </div>
+    <p class="hint" id="token-hint"><a href="/setup/">Get a free token</a> if you don’t have one.</p>
   </div>
 
-  <div class="tabs" id="tabs"></div>
-  <div id="panel"></div>
+  <div class="card cta">
+    <h2>Cursor</h2>
+    <pre class="cmd" id="cursor-cmd">npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent cursor</pre>
+    <button type="button" class="btn primary" id="copy-cursor">Copy Cursor command</button>
+    <p class="hint">Runs locally on your machine. Writes <code>~/.cursor/mcp.json</code>. The brain stays on the host — this page never calls it.</p>
+  </div>
+
+  <details class="more" id="more">
+    <summary>Other agents</summary>
+    <div class="agents" id="tabs" role="tablist"></div>
+    <div class="agent-panel" id="panel"></div>
+  </details>
 </main>
 <script>
 const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
 const DEFAULT_BASE = (location.origin.includes('localhost') || location.origin.includes('127.0.0.1'))
   ? location.origin : 'https://bot.getzoro.com';
-$('base').value = localStorage.getItem('am_base') || DEFAULT_BASE;
-$('token').value = localStorage.getItem('am_token') || '';
+
+$('base').value = qs.get('url') || localStorage.getItem('am_base') || DEFAULT_BASE;
+$('token').value = qs.get('token') || localStorage.getItem('am_token') || '';
 
 function base() {
   return ($('base').value || DEFAULT_BASE).replace(/\/+$/, '').replace(/\/mcp$/, '');
@@ -81,8 +158,20 @@ function mcpJson(style='generic') {
   }, null, 2);
 }
 
+function cursorCmd() {
+  return `npx --yes agent-manager-brain connect --url ${base()}${tokFlag()} --agent cursor`;
+}
+
 const PLATFORMS = [
-  { id:'npx', label:'npm', title:'npx',
+  { id:'claude', label:'Claude', title:'Claude Code',
+    code(){ const h = token() ? ` \\\n  --header "X-Token: ${token()}"` : '';
+      return `claude mcp add --transport http agent-manager ${mcpUrl()}${h}`; }},
+  { id:'vscode', label:'VS Code', title:'VS Code / Copilot', code:()=>mcpJson('vscode') },
+  { id:'windsurf', label:'Windsurf', title:'Windsurf', code:()=>mcpJson('generic') },
+  { id:'cline', label:'Cline', title:'Cline', code:()=>mcpJson('generic') },
+  { id:'continue', label:'Continue', title:'Continue', code:()=>mcpJson('continue') },
+  { id:'zed', label:'Zed', title:'Zed', code:()=>mcpJson('zed') },
+  { id:'npx', label:'npm', title:'npx (any agent)',
     code(){ return `npx --yes agent-manager-brain connect --url ${base()}${tokFlag()} --agent vscode`; }},
   { id:'selfhost', label:'Self-host', title:'Self-host',
     code(){ return [
@@ -90,66 +179,78 @@ const PLATFORMS = [
       `npx --yes agent-manager-brain serve`,
       `npx --yes agent-manager-brain connect --url http://127.0.0.1:8075${tokFlag()} --agent generic`,
     ].join('\n'); }},
-  { id:'claude', label:'Claude', title:'Claude Code',
-    code(){ const h = token() ? ` \\\n  --header "X-Token: ${token()}"` : '';
-      return `claude mcp add --transport http agent-manager ${mcpUrl()}${h}`; }},
-  { id:'vscode', label:'VS Code', title:'VS Code / Copilot', code:()=>mcpJson('vscode') },
-  { id:'cursor', label:'Cursor', title:'Cursor', code:()=>mcpJson('generic') },
-  { id:'windsurf', label:'Windsurf', title:'Windsurf', code:()=>mcpJson('generic') },
-  { id:'cline', label:'Cline', title:'Cline', code:()=>mcpJson('generic') },
-  { id:'continue', label:'Continue', title:'Continue', code:()=>mcpJson('continue') },
-  { id:'zed', label:'Zed', title:'Zed', code:()=>mcpJson('zed') },
   { id:'generic', label:'JSON', title:'MCP JSON', code:()=>mcpJson('generic') },
-  { id:'curl', label:'curl', title:'curl',
-    code(){ const t=token()||'YOUR_TOKEN'; const b=base();
-      return `curl -s "${b}/api/search?q=test" -H "X-Token: ${t}"`; }},
+  { id:'curl', label:'curl', title:'curl smoke',
+    code(){ const t=token()||'YOUR_TOKEN';
+      return `curl -s "${base()}/api/search?q=test" -H "X-Token: ${t}"`; }},
 ];
 
-let ACTIVE = 'npx';
+let ACTIVE = qs.get('agent') || 'claude';
+if (ACTIVE === 'cursor') ACTIVE = 'claude';
 
 function persist() {
   localStorage.setItem('am_base', base());
   if (token()) localStorage.setItem('am_token', token());
-  $('status').innerHTML = token()
-    ? 'Token in snippets — keep private.'
-    : '<a href="/setup/">Get a token</a> if you don’t have one.';
+  const has = !!token();
+  $('status').textContent = has
+    ? 'Token stays in your browser — this page never talks to the brain.'
+    : 'Paste your token, then copy. No Spark round-trip — this page is static.';
+  $('token-hint').innerHTML = has
+    ? '<span class="okmsg">Token ready.</span>'
+    : '<a href="/setup/">Get a free token</a> if you don’t have one.';
+  $('cursor-cmd').textContent = cursorCmd();
 }
 
-async function copyText(text, btn) {
+async function copyText(text, btn, okLabel) {
   try {
     await navigator.clipboard.writeText(text);
     const old = btn.textContent;
-    btn.textContent = 'Copied';
+    btn.textContent = okLabel || 'Copied';
     btn.classList.add('ok');
-    setTimeout(() => { btn.textContent = old; btn.classList.remove('ok'); }, 1000);
-  } catch { btn.textContent = 'Select'; }
+    setTimeout(() => { btn.textContent = old; btn.classList.remove('ok'); }, 1200);
+  } catch {
+    const r = document.createRange();
+    r.selectNodeContents($('cursor-cmd'));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    btn.textContent = 'Select & copy';
+  }
 }
 
-function render() {
-  persist();
+function renderMore() {
   $('tabs').innerHTML = PLATFORMS.map(p =>
-    `<button data-id="${p.id}" class="${p.id===ACTIVE?'on':''}">${p.label}</button>`
+    `<button type="button" data-id="${p.id}" class="${p.id===ACTIVE?'on':''}">${p.label}</button>`
   ).join('');
   const p = PLATFORMS.find(x => x.id === ACTIVE) || PLATFORMS[0];
   const code = p.code();
   $('panel').innerHTML = `
-    <div class="card">
-      <h2>${p.title}</h2>
-      <div class="toolbar"><button class="copy" type="button">Copy</button></div>
-      <pre id="snippet"></pre>
-    </div>`;
+    <h2 style="margin:0 0 8px;font-size:14px">${p.title}</h2>
+    <div class="toolbar"><button class="copy" type="button">Copy</button></div>
+    <pre class="cmd" id="snippet"></pre>`;
   $('snippet').textContent = code;
-  $('panel').querySelector('.copy').onclick = ev => copyText(code, ev.currentTarget);
+  $('panel').querySelector('.copy').onclick = ev => copyText(code, ev.currentTarget, 'Copied');
 }
 
+function render() {
+  persist();
+  renderMore();
+}
+
+$('copy-cursor').onclick = ev => copyText(cursorCmd(), ev.currentTarget, 'Copied — paste in a terminal');
 $('tabs').onclick = e => {
   const b = e.target.closest('button[data-id]');
   if (!b) return;
   ACTIVE = b.dataset.id;
-  render();
+  renderMore();
 };
 $('base').addEventListener('input', render);
 $('token').addEventListener('input', render);
+
+// If ?agent= opens a non-cursor target, expand the secondary panel.
+if (qs.get('agent') && qs.get('agent') !== 'cursor') {
+  $('more').open = true;
+  ACTIVE = qs.get('agent');
+}
+
 render();
 </script>
 </body>

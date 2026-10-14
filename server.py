@@ -196,13 +196,18 @@ class Handler(BaseHTTPRequestHandler):
     def _authed(self):
         return token_ok(presented_token(self))
 
-    def _file(self, path, ctype):
+    def _file(self, path, ctype, cache=None):
+        """Serve a static file. `cache` is a Cache-Control value; public
+        marketing/connect pages should be edge-cacheable so Cloudflare does
+        not round-trip the Spark on every visit."""
         if not os.path.isfile(path):
             return self._json(404, {"error": "not found"})
         body = open(path, "rb").read()
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
+        if cache:
+            self.send_header("Cache-Control", cache)
         self.end_headers()
         self.wfile.write(body)
 
@@ -236,20 +241,28 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/space", "/space/") or path.startswith("/space/"):
             return self._json(410, {"error": "gone"})
 
+        # Edge-cacheable static shell. Brain UI stays short-cache (token UI).
+        EDGE = "public, max-age=120, s-maxage=86400, stale-while-revalidate=604800"
         if path == "/static/app.css":
-            return self._file(os.path.join(STATIC, "app.css"), "text/css")
+            return self._file(os.path.join(STATIC, "app.css"), "text/css",
+                              cache=EDGE)
         if path in ("/", "/index.html", "/home"):
             return self._file(os.path.join(STATIC, "home.html"),
-                              "text/html; charset=utf-8")
+                              "text/html; charset=utf-8", cache=EDGE)
         if path in ("/setup", "/setup/"):
+            # Setup can mint tokens — keep browser-fresh, still allow brief CDN.
             return self._file(os.path.join(STATIC, "setup.html"),
-                              "text/html; charset=utf-8")
+                              "text/html; charset=utf-8",
+                              cache="public, max-age=60, s-maxage=300")
         if path in ("/connect", "/connect/"):
+            # Fully static one-click page (no API). Cache hard at the edge so
+            # phones don't wait on the Spark tunnel for a copy button.
             return self._file(os.path.join(STATIC, "connect.html"),
-                              "text/html; charset=utf-8")
+                              "text/html; charset=utf-8", cache=EDGE)
         if path in ("/brain", "/brain/"):
             return self._file(os.path.join(BRAIN_STATIC, "index.html"),
-                              "text/html; charset=utf-8")
+                              "text/html; charset=utf-8",
+                              cache="private, max-age=0")
 
         if path == "/api/setup/status":
             return self._json(200, setup_status())
