@@ -11,7 +11,7 @@
     "Mazin": {"type": "person", "blurb": "Owner"},
     "hermes": {"type": "tool", "blurb": "Agent runtime"},
     "cursor": {"type": "tool", "blurb": "Coding agent"},
-    "agent-manager": {"type": "project", "blurb": "bot.getzoro.com chat + brain + MCP"}
+    "agent-manager": {"type": "project", "blurb": "bot.getzoro.com shared brain + MCP"}
   },
   "sources": [
     {

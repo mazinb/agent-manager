@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Agent manager — unified dashboard + shared brain + MCP.
+"""Agent manager — shared brain dashboard + MCP.
 
 One process on :8075:
   /                 Public landing
-  /setup/           Token onboarding (bootstrap / signup / paste)
-  /connect/         Public one-click agent connect docs
+  /setup/           Token onboarding
+  /connect/         One-click MCP connect docs
   /brain/           Shared brain UI
   /api/*            JSON API (token)
   /mcp              Streamable HTTP MCP (token on POST)
@@ -16,9 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 import secrets
-import subprocess
 import sys
 import threading
 import time
@@ -35,18 +33,12 @@ STATIC = os.path.join(ROOT, "static")
 BRAIN_STATIC = os.path.join(ROOT, "agent_context", "static")
 DATA = os.path.join(ROOT, "data")
 TOKENS_PATH = os.path.join(DATA, "tokens.json")
-PROFILES = os.path.expanduser("~/.hermes/profiles")
-HERMES = os.path.expanduser("~/.local/bin/hermes")
-CHAT_TIMEOUT = int(os.environ.get("CHAT_TIMEOUT", "420"))
 CONFIG_PATH = os.environ.get(
     "AGENT_MANAGER_CONFIG",
     os.path.expanduser("~/.config/agent-manager/config.json"),
 )
 LEGACY_CONFIG = os.path.expanduser("~/.config/agent-context/config.json")
 _TOKEN_LOCK = threading.Lock()
-
-META_RE = re.compile(
-    r"^(Session|Title|Duration|Messages|Cost|Model):.*$", re.MULTILINE)
 
 
 def load_env():
@@ -150,7 +142,6 @@ def create_token(label: str, role: str = "user"):
 
 
 def write_env_token(token: str):
-    """Persist bootstrap token into .env for local self-host convenience."""
     path = os.path.join(ROOT, ".env")
     lines = []
     if os.path.isfile(path):
@@ -188,58 +179,6 @@ def token_ok(token: str) -> bool:
         if secrets.compare_digest(row.get("hash", ""), digest):
             return True
     return False
-
-
-def list_agents():
-    agents = []
-    if os.path.isdir(PROFILES):
-        for name in sorted(os.listdir(PROFILES)):
-            soul = os.path.join(PROFILES, name, "SOUL.md")
-            if not os.path.isfile(soul):
-                continue
-            desc = ""
-            with open(soul) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#"):
-                        desc = line
-                        break
-            agents.append({"name": name, "blurb": desc})
-    return agents
-
-
-def valid_agent(name):
-    return bool(re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", name or "")) and \
-        os.path.isfile(os.path.join(PROFILES, name, "SOUL.md"))
-
-
-def chat(agent, message):
-    cmd = [HERMES, "-p", agent, "chat", "-Q", "-q", message]
-    proc = subprocess.run(cmd, capture_output=True, text=True,
-                          timeout=CHAT_TIMEOUT, env={**os.environ})
-    out = (proc.stdout or "").strip()
-    err = (proc.stderr or "").strip()
-    lines = out.splitlines()
-    while lines and (META_RE.match(lines[-1]) or not lines[-1].strip()):
-        lines.pop()
-    reply = "\n".join(lines).strip() or err or "(empty reply)"
-    return reply, proc.returncode
-
-
-def append_history(agent, role, text):
-    os.makedirs(DATA, exist_ok=True)
-    path = os.path.join(DATA, f"history-{agent}.jsonl")
-    with open(path, "a") as f:
-        f.write(json.dumps({"ts": time.time(), "role": role, "text": text}) + "\n")
-
-
-def read_history(agent, limit=60):
-    path = os.path.join(DATA, f"history-{agent}.jsonl")
-    if not os.path.exists(path):
-        return []
-    with open(path) as f:
-        rows = [json.loads(l) for l in f if l.strip()]
-    return rows[-limit:]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -280,27 +219,23 @@ class Handler(BaseHTTPRequestHandler):
         path = u.path
         q = parse_qs(u.query)
 
-        if path == "/context":
+        if path == "/context" or path.startswith("/context/"):
+            rest = path[len("/context"):] or "/"
+            self.send_response(301)
+            self.send_header("Location", "/brain" + (
+                rest if path.startswith("/context/") else "/"))
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if path in ("/agents", "/agents/") or path.startswith("/agents/"):
             self.send_response(301)
             self.send_header("Location", "/brain/")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if path.startswith("/context/"):
-            rest = path[len("/context"):] or "/"
-            self.send_response(301)
-            self.send_header("Location", "/brain" + rest + (
-                f"?{u.query}" if u.query else ""))
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-            return
         if path in ("/space", "/space/") or path.startswith("/space/"):
-            return self._json(410, {
-                "error": "gone",
-                "message": "Public /space was removed. Use /mcp with a token.",
-            })
+            return self._json(410, {"error": "gone"})
 
-        # Public UIs + shared assets
         if path == "/static/app.css":
             return self._file(os.path.join(STATIC, "app.css"), "text/css")
         if path in ("/", "/index.html", "/home"):
@@ -312,23 +247,16 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/connect", "/connect/"):
             return self._file(os.path.join(STATIC, "connect.html"),
                               "text/html; charset=utf-8")
-        if path in ("/agents", "/agents/"):
-            self.send_response(301)
-            self.send_header("Location", "/brain/")
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-            return
         if path in ("/brain", "/brain/"):
             return self._file(os.path.join(BRAIN_STATIC, "index.html"),
                               "text/html; charset=utf-8")
 
-        # Public setup + MCP discovery
         if path == "/api/setup/status":
             return self._json(200, setup_status())
         if path == "/mcp":
             return self._json(200, {
                 "server": "agent-manager",
-                "version": "0.3.2",
+                "version": "0.3.3",
                 "transport": "streamable-http (POST JSON-RPC to /mcp)",
                 "tools": [t["name"] for t in mcp.TOOLS],
                 "auth": "X-Token or Authorization: Bearer",
@@ -337,13 +265,6 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._json(401, {"error": "unauthorized"})
 
-        if path == "/api/agents":
-            return self._json(200, {"agents": list_agents()})
-        if path == "/api/history":
-            agent = (q.get("agent") or [""])[0]
-            if not valid_agent(agent):
-                return self._json(400, {"error": "bad agent"})
-            return self._json(200, {"history": read_history(agent)})
         if path == "/api/stats":
             return self._json(200, query.stats(BRAIN.con))
         if path == "/api/search":
@@ -374,12 +295,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         if path.startswith("/space"):
-            return self._json(410, {
-                "error": "gone",
-                "message": "Public /space was removed. Use /mcp with a token.",
-            })
+            return self._json(410, {"error": "gone"})
 
-        # Public setup endpoints
         if path == "/api/setup/bootstrap":
             try:
                 payload = self._read_json()
@@ -388,8 +305,7 @@ class Handler(BaseHTTPRequestHandler):
             if configured():
                 return self._json(409, {
                     "error": "already_configured",
-                    "message": "This brain already has a token. "
-                               "Paste it on /setup/ or self-host your own.",
+                    "message": "This brain already has a token.",
                 })
             raw, row = create_token(payload.get("label") or "owner",
                                     role="owner")
@@ -413,16 +329,9 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 return self._json(400, {"error": "bad json"})
             if not configured():
-                return self._json(400, {
-                    "error": "bootstrap_required",
-                    "message": "Use /api/setup/bootstrap first.",
-                })
+                return self._json(400, {"error": "bootstrap_required"})
             if not ALLOW_PUBLIC_SIGNUP:
-                return self._json(403, {
-                    "error": "signup_closed",
-                    "message": "Public signup is disabled. "
-                               "Self-host or ask an admin for a token.",
-                })
+                return self._json(403, {"error": "signup_closed"})
             if SETUP_INVITE_CODE:
                 if (payload.get("invite") or "").strip() != SETUP_INVITE_CODE:
                     return self._json(403, {"error": "invalid_invite"})
@@ -444,8 +353,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"ok": True})
             return self._json(401, {"ok": False, "error": "unauthorized"})
 
-        if path not in ("/api/chat", "/api/ask", "/api/refresh",
-                        "/api/note", "/mcp"):
+        if path not in ("/api/ask", "/api/refresh", "/api/note", "/mcp"):
             return self._json(404, {"error": "not found"})
         if not self._authed():
             return self._json(401, {"error": "unauthorized"})
@@ -460,23 +368,6 @@ class Handler(BaseHTTPRequestHandler):
             if resp is None:
                 return self._json(202, {})
             return self._json(200, resp)
-
-        if path == "/api/chat":
-            agent = payload.get("agent", "")
-            message = (payload.get("message") or "").strip()
-            if not valid_agent(agent):
-                return self._json(400, {"error": "unknown agent"})
-            if not message:
-                return self._json(400, {"error": "empty message"})
-            append_history(agent, "user", message)
-            try:
-                reply, rc = chat(agent, message)
-            except subprocess.TimeoutExpired:
-                reply, rc = f"(timed out after {CHAT_TIMEOUT}s)", 124
-            except Exception as e:
-                reply, rc = f"(error: {e})", 1
-            append_history(agent, "assistant", reply)
-            return self._json(200, {"reply": reply, "rc": rc})
 
         if path == "/api/note":
             try:
@@ -503,7 +394,7 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     store.connect(BRAIN_CFG["db_path"]).close()
     port = int(os.environ.get("AGENT_MANAGER_PORT", "8075"))
-    print(f"agent-manager on :{port} (public setup + brain + mcp)", flush=True)
+    print(f"agent-manager on :{port} (setup + brain + mcp)", flush=True)
     print(f"  bootstrap={not configured()} signup_open={ALLOW_PUBLIC_SIGNUP}",
           flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
