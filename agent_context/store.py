@@ -52,6 +52,7 @@ TRUST_COLUMNS = (
     ("confidence", "REAL"),
     ("stale", "INTEGER DEFAULT 0"),
     ("based_on", "TEXT"),
+    ("origin", "TEXT DEFAULT 'ai'"),
 )
 
 
@@ -135,12 +136,20 @@ def upsert_source(con, path, kind, project, mtime, size, text_chunks):
     return sid
 
 
-def set_note_meta(con, sid, confidence=None, based_on=None):
+def set_note_meta(con, sid, confidence=None, based_on=None, origin=None):
     """Trust metadata for a note: (re)saving refreshes verified_at and clears
-    the stale flag. based_on: list of source paths the note was derived from."""
+    the stale flag. based_on: list of source paths the note was derived from.
+    origin: 'ai' (agent-written, default) or 'human' (edited by a person)."""
+    if origin is not None and origin not in ("ai", "human"):
+        raise ValueError("origin must be 'ai' or 'human'")
     con.execute(
-        "UPDATE sources SET verified_at=?, stale=0, confidence=?, based_on=? WHERE id=?",
-        (time.time(), confidence, json.dumps(based_on) if based_on else None, sid))
+        "UPDATE sources SET verified_at=?, stale=0, confidence=?, based_on=?"
+        + (", origin=?" if origin is not None else "") + " WHERE id=?",
+        ((time.time(), confidence,
+          json.dumps(based_on) if based_on else None,
+          origin, sid) if origin is not None else
+         (time.time(), confidence,
+          json.dumps(based_on) if based_on else None, sid)))
 
 
 def flag_stale_for_sources(con, changed_paths):
@@ -164,6 +173,42 @@ def flag_stale_for_sources(con, changed_paths):
             con.execute("UPDATE sources SET stale=1 WHERE id=?", (r["id"],))
             n += 1
     return n
+
+
+def list_notes(con, project=None):
+    """Inbox rows: every kind='note' source with title, body and trust
+    badges. Title is parsed from the path (note:project/title); the body is
+    reassembled from chunks (long notes are chunked, so this is a faithful
+    rejoin, not a copy). Ordered newest-verified first."""
+    sql = ("SELECT id, path, project, size, verified_at, confidence,"
+           " stale, based_on, origin FROM sources WHERE kind='note'")
+    args = ()
+    if project:
+        sql += " AND project=?"
+        args = (project,)
+    sql += " ORDER BY verified_at DESC, id DESC"
+    notes = []
+    for r in con.execute(sql, args):
+        _, _, rest = r["path"].partition(":")
+        _, _, title = rest.partition("/")
+        chunks = con.execute(
+            "SELECT text FROM chunks WHERE source_id=? ORDER BY ord",
+            (r["id"],)).fetchall()
+        body = "\n\n".join(c["text"] for c in chunks)
+        prefix = f"# {title}\n\n"
+        if body.startswith(prefix):
+            body = body[len(prefix):]
+        try:
+            based_on = json.loads(r["based_on"]) if r["based_on"] else []
+        except (ValueError, TypeError):
+            based_on = []
+        notes.append({
+            "project": r["project"], "title": title, "body": body,
+            "confidence": r["confidence"], "verified_at": r["verified_at"],
+            "stale": r["stale"], "based_on": based_on,
+            "origin": r["origin"] or "ai",
+        })
+    return notes
 
 
 def prune_stale(con, live_paths):

@@ -90,6 +90,14 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-14** — Setup tab becomes the Inbox once a token is saved: notes
+  list with project / AI-vs-Human / confidence / stale / ✓-age badges, tap to
+  edit inline (human edits badged `origin: human`), New-note form. New
+  `GET /api/inbox` (token-auth), `origin` column + `store.list_notes()`,
+  `origin` param on the note tool. Optional GitHub sign-in (`read:user` only,
+  read-only — public profile, token discarded after login, mints the same API
+  token; enable with `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` in `.env`,
+  callback `/api/auth/github/callback`). 11 new tests (36 total).
 - **2026-10-14** — Connect page is edge-static: inlined CSS (no second
   Spark hop for `/static/app.css`), `Cache-Control` so Cloudflare can
   serve `/connect/` without the tunnel, one-click Cursor CTA + secondary

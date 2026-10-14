@@ -85,10 +85,14 @@ def _note(brain, args):
         if not isinstance(based_on, list) or not all(isinstance(s, str) for s in based_on):
             raise ValueError("sources must be a list of paths (e.g. the repo files the note is based on)")
         based_on = [s[:512] for s in based_on[:32]]
+    origin = args.get("origin") or "ai"
+    if origin not in ("ai", "human"):
+        raise ValueError("origin must be 'ai' or 'human'")
     sid = store.upsert_source(
         brain.con, f"note:{project}/{title}", "note", project,
         time.time(), len(body), _chunk_markdown(f"# {title}\n\n{body}"))
-    store.set_note_meta(brain.con, sid, confidence=confidence, based_on=based_on)
+    store.set_note_meta(brain.con, sid, confidence=confidence,
+                        based_on=based_on, origin=origin)
     brain.con.commit()
     return {"ok": True, "project": project, "title": title}
 

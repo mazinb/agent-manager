@@ -26,7 +26,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from agent_context import llm, mcp, query, store  # noqa: E402
+from agent_context import github_login, llm, mcp, query, store  # noqa: E402
 from agent_context.server import Brain  # noqa: E402
 
 STATIC = os.path.join(ROOT, "static")
@@ -121,7 +121,11 @@ def setup_status():
         "signup_open": bool(ALLOW_PUBLIC_SIGNUP) and configured(),
         "invite_required": bool(SETUP_INVITE_CODE) and ALLOW_PUBLIC_SIGNUP,
         "auth": "token",
-        "oauth": {"github": False, "google": False},
+        "oauth": {
+            "github": bool(ENV.get("GITHUB_CLIENT_ID")
+                           and ENV.get("GITHUB_CLIENT_SECRET")),
+            "google": False,
+        },
     }
 
 
@@ -226,6 +230,25 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length) if length else b"{}"
         return json.loads(raw or b"{}")
 
+    def _redirect(self, url):
+        self.send_response(302)
+        self.send_header("Location", url)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _html_page(self, heading, script):
+        body = (
+            "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<title>{heading}</title></head><body>"
+            f"<h2>{heading}</h2><p>Signing you in…</p>"
+            f"<script>{script}</script></body></html>").encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_HEAD(self):
         self.do_GET()
 
@@ -288,6 +311,37 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._json(401, {"error": "unauthorized"})
 
+        if path == "/api/auth/github/start":
+            if not github_login.configured(ENV):
+                return self._json(503,
+                                  {"error": "github_login_not_configured"})
+            host = self.headers.get("Host") or "localhost"
+            base = (ENV.get("GITHUB_REDIRECT_BASE")
+                    or f"https://{host}").rstrip("/")
+            redirect_uri = base + "/api/auth/github/callback"
+            state = github_login.new_state()
+            url = github_login.build_authorize_url(
+                ENV["GITHUB_CLIENT_ID"], redirect_uri, state)
+            return self._redirect(url)
+
+        if path == "/api/auth/github/callback":
+            qs2 = {k: v[0] for k, v in
+                   parse_qs(urlparse(self.path).query).items()}
+            try:
+                login = github_login.complete(
+                    qs2.get("code", ""), qs2.get("state", ""), ENV)
+            except github_login.GitHubError as e:
+                return self._json(400, {"error": str(e)})
+            raw, _row = create_token(f"github:{login}", role="user")
+            return self._html_page(
+                "Signed in as " + login,
+                f"localStorage.setItem('am_token', {json.dumps(raw)});"
+                "location.href = '/brain/';")
+
+        if path == "/api/inbox":
+            project = (q.get("project") or [None])[0] or None
+            return self._json(200,
+                              {"notes": store.list_notes(BRAIN.con, project)})
         if path == "/api/stats":
             return self._json(200, query.stats(BRAIN.con))
         if path == "/api/search":
