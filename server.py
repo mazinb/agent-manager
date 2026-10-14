@@ -269,7 +269,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, query.stats(BRAIN.con))
         if path == "/api/search":
             return self._json(200, {"results": query.search(
-                BRAIN.con, (q.get("q") or [""])[0])})
+                BRAIN.con, (q.get("q") or [""])[0],
+                project=(q.get("project") or [None])[0] or None)})
         if path == "/api/entity":
             card = query.entity_card(BRAIN.con, (q.get("name") or [""])[0])
             return self._json(200, card or {"error": "unknown"})
@@ -367,6 +368,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "bad json"})
 
         if path == "/mcp":
+            # ?project=X on the MCP URL pins a default project for search/ask
+            # (connect --project X writes this into the client's MCP config)
+            qs = {k: v[0] for k, v in
+                  parse_qs(urlparse(self.path).query).items()}
+            if (payload.get("method") == "tools/call"
+                    and (payload.get("params") or {}).get("name") in ("search", "ask")
+                    and qs.get("project")):
+                args = payload["params"].setdefault("arguments", {}) or {}
+                if not args.get("project"):
+                    args["project"] = qs["project"]
             resp = mcp.handle(BRAIN, payload)
             if resp is None:
                 return self._json(202, {})
@@ -385,7 +396,8 @@ class Handler(BaseHTTPRequestHandler):
         if not qs:
             return self._json(400, {"error": "empty q"})
         chunks = query.search(BRAIN.con, qs,
-                              include_stale=bool(payload.get("include_stale", False)))
+                              include_stale=bool(payload.get("include_stale", False)),
+                              project=payload.get("project"))
         answer = None
         if payload.get("use_llm", True):
             lc = BRAIN.config.get("llm") or {}

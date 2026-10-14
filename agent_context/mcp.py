@@ -19,7 +19,8 @@ def _search(brain, args):
     from . import query
     return {"results": query.search(
         brain.con, args.get("q", ""), int(args.get("limit", 12)),
-        include_stale=bool(args.get("include_stale", False)))}
+        include_stale=bool(args.get("include_stale", False)),
+        project=args.get("project"))}
 
 
 def _ask(brain, args):
@@ -28,7 +29,8 @@ def _ask(brain, args):
     if not q:
         raise ValueError("q is required")
     chunks = query.search(brain.con, q,
-                          include_stale=bool(args.get("include_stale", False)))
+                          include_stale=bool(args.get("include_stale", False)),
+                          project=args.get("project"))
     answer = None
     if args.get("use_llm", True):
         lc = brain.config.get("llm") or {}
@@ -96,12 +98,17 @@ TOOLS = [
      "Stale notes (based-on source changed) are excluded unless include_stale.",
      "inputSchema": {"type": "object", "properties": {
          "q": {"type": "string"}, "limit": {"type": "integer", "default": 12},
-         "include_stale": {"type": "boolean", "default": False}},
+         "include_stale": {"type": "boolean", "default": False},
+         "project": {"type": "string",
+                     "description": "Scope to one project (space); omit for all."}},
          "required": ["q"]}},
     {"name": "ask", "description": "Grounded question answering over the brain; "
      "returns a cited answer when an LLM backend is configured.",
      "inputSchema": {"type": "object", "properties": {
-         "q": {"type": "string"}, "use_llm": {"type": "boolean", "default": True}},
+         "q": {"type": "string"}, "use_llm": {"type": "boolean", "default": True},
+         "include_stale": {"type": "boolean", "default": False},
+         "project": {"type": "string",
+                     "description": "Scope to one project (space); omit for all."}},
          "required": ["q"]}},
     {"name": "entity", "description": "Entity card: mentions, linked chunks, graph neighbors.",
      "inputSchema": {"type": "object", "properties": {

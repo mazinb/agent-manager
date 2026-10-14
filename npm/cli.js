@@ -260,7 +260,9 @@ function stopCmd(args) {
 
 function connect(args) {
   const base = requireBase(args);
-  const url = base + "/mcp";
+  // ?project=X pins a default project for search/ask calls through this MCP URL
+  const url = base + "/mcp" +
+    (args.project ? "?project=" + encodeURIComponent(args.project) : "");
   const token = args.token || TOKEN || "";
   const name = args.name || "agent-manager";
   let agent = (args.agent || "generic").toLowerCase();
@@ -385,15 +387,19 @@ async function main() {
         console.log(`[${c.project}/${c.kind}] ${c.path} :: ${(c.heading || "").slice(0, 60)}`);
       return;
     } else if (cmd === "search") {
-      out = await api(base, token, "GET",
-        "/api/search?q=" + encodeURIComponent(args._.slice(1).join(" ")));
+      const sp = new URLSearchParams({ q: args._.slice(1).join(" ") });
+      if (args.project) sp.set("project", args.project);
+      if (args["include-stale"]) sp.set("include_stale", "true");
+      out = await api(base, token, "GET", "/api/search?" + sp);
     } else if (cmd === "pack") {
       out = await api(base, token, "GET",
         "/api/context?project=" + encodeURIComponent(args._[1] || ""));
       console.log(out.pack); return;
     } else if (cmd === "note") {
       out = await api(base, token, "POST", "/api/note",
-        { project: args.project, title: args.title || "untitled", body: args.body });
+        { project: args.project, title: args.title || "untitled", body: args.body,
+          ...(args.confidence !== undefined ? { confidence: parseFloat(args.confidence) } : {}),
+          ...(args.sources ? { sources: String(args.sources).split(",").map(s => s.trim()) } : {}) });
     } else if (cmd === "stats") {
       out = await api(base, token, "GET", "/api/stats");
     } else {
@@ -409,6 +415,7 @@ async function main() {
 const __doc = `agent-manager-brain — shared brain for any coding agent
 
   connect  --url https://host --token TOK --agent <platform>
+           [--project X]  pin a default project for search/ask via ?project=
            platforms: cursor claude vscode copilot windsurf cline
                       continue zed codex gemini generic
   setup    [--agent X] [--port 8075] [--dir DIR] [--token TOK]

@@ -24,23 +24,28 @@ def _body_without_heading(text, heading):
     return text
 
 
-def search(con, q, limit=12, include_stale=False):
+def search(con, q, limit=12, include_stale=False, project=None):
     """Hybrid: FTS hits + chunks mentioning entities named in the query.
 
     Stale notes (their based-on source changed or vanished) are excluded
     unless include_stale=True; the `stale` field still rides on every result.
+    project=None searches all projects; a project name scopes results to it.
     """
     expr = _fts_expr(q)
     stale_guard = "" if include_stale else \
         " AND NOT (s.kind='note' AND COALESCE(s.stale, 0))"
+    project_guard = ""
+    if project:
+        project_guard = " AND s.project=?"
     results = {}
     if expr:
         rows = con.execute(
             "SELECT c.id, c.heading, c.text, s.path, s.project, s.kind, s.stale "
             "FROM chunks_fts f JOIN chunks c ON c.id=f.rowid "
             "JOIN sources s ON c.source_id=s.id "
-            "WHERE chunks_fts MATCH ?" + stale_guard +
-            " ORDER BY rank LIMIT ?", (expr, limit * 2))
+            "WHERE chunks_fts MATCH ?" + project_guard + stale_guard +
+            " ORDER BY rank LIMIT ?", (expr, *([project] if project else []),
+                                      limit * 2))
         for r in rows:
             results[r["id"]] = dict(r)
     # entity expansion: query names an entity -> its mentioned chunks
@@ -52,8 +57,8 @@ def search(con, q, limit=12, include_stale=False):
                 "SELECT c.id, c.heading, c.text, s.path, s.project, s.kind, s.stale "
                 "FROM mentions mn JOIN chunks c ON c.id=mn.chunk_id "
                 "JOIN sources s ON c.source_id=s.id "
-                "WHERE mn.entity_id=?" + stale_guard + " LIMIT ?",
-                (erow["id"], limit))
+                "WHERE mn.entity_id=?" + project_guard + stale_guard + " LIMIT ?",
+                (erow["id"], *([project] if project else []), limit))
             for r in rows:
                 results.setdefault(r["id"], dict(r))
     # rank: project matches + shorter chunks first as a cheap relevance proxy

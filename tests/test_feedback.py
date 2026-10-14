@@ -161,5 +161,46 @@ class Chunk2SourceChangeInvalidation(unittest.TestCase):
         ).fetchone()["stale"], 0)
 
 
+class Chunk3PerProjectScoping(unittest.TestCase):
+    def _seed_two_projects(self, con):
+        # same keyword in both projects — the cross-contamination trap
+        store.upsert_source(con, "docs/a.md", "project_readme", "alpha",
+                            1, 10, [("dep", "alpha uses build system ONE")])
+        store.upsert_source(con, "docs/b.md", "project_readme", "beta",
+                            1, 20, [("dep", "beta uses build system TWO")])
+
+    def test_search_without_project_returns_both(self):
+        from agent_context import query
+        con = fresh_con()
+        self._seed_two_projects(con)
+        hits = query.search(con, "dep")
+        self.assertEqual({r["project"] for r in hits}, {"alpha", "beta"})
+
+    def test_search_scoped_to_project_no_contamination(self):
+        from agent_context import query
+        con = fresh_con()
+        self._seed_two_projects(con)
+        hits = query.search(con, "dep", project="alpha")
+        self.assertNotEqual(hits, [])
+        self.assertEqual({r["project"] for r in hits}, {"alpha"})
+
+    def test_mcp_search_scoped(self):
+        from agent_context import mcp
+
+        class FakeBrain:
+            pass
+        con = fresh_con()
+        self._seed_two_projects(con)
+        brain = FakeBrain()
+        brain.con = con
+        brain.config = {"llm": {}}  # no LLM -> extractive fallback path
+        out = mcp.handle(brain, {"method": "tools/call",
+                                 "params": {"name": "search", "arguments": {
+                                     "q": "dep", "project": "beta"}}})
+        self.assertIsNotNone(out)
+        payload = json.loads(out["result"]["content"][0]["text"])
+        self.assertEqual({r["project"] for r in payload["results"]}, {"beta"})
+
+
 if __name__ == "__main__":
     unittest.main()
