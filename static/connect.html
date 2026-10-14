@@ -103,7 +103,12 @@ details.more[open] > summary::after{content:"Hide"}
 
   <div class="card cta">
     <h2>Cursor</h2>
-    <pre class="cmd" id="cursor-cmd">npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent cursor</pre>
+    <div class="row" style="margin-bottom:10px">
+      <a class="btn primary" id="deeplink-cursor" href="/setup/">Install in Cursor — one click</a>
+      <a class="btn ghost" id="deeplink-vscode" href="/setup/">Install in VS Code</a>
+    </div>
+    <p class="hint" id="deeplink-hint">Get a token first — then these write <code>~/.cursor/mcp.json</code> / VS Code MCP config via the official install links, no terminal.</p>
+    <pre class="cmd" id="cursor-cmd" style="margin-top:10px">npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent cursor</pre>
     <button type="button" class="btn primary" id="copy-cursor">Copy Cursor command</button>
     <p class="hint">Runs locally on your machine. Writes <code>~/.cursor/mcp.json</code>. The brain stays on the host — this page never calls it.</p>
   </div>
@@ -162,6 +167,31 @@ function cursorCmd() {
   return `npx --yes agent-manager-brain connect --url ${base()}${tokFlag()} --agent cursor`;
 }
 
+// One-click install links (official formats):
+//   Cursor: cursor://anysphere.cursor-deeplink/mcp/install?name=NAME&config=BASE64(json)
+//   VS Code: vscode:mcp/install?name=NAME&config=URLENCODED(json)
+function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
+function deeplinkConfig() {
+  const t = token();
+  if (!t) return null;
+  return { url: mcpUrl(), headers: { 'X-Token': t } };
+}
+function cursorDeeplink() {
+  const cfg = deeplinkConfig();
+  if (!cfg) return null;
+  return 'cursor://anysphere.cursor-deeplink/mcp/install?name='
+    + encodeURIComponent('agent-manager')
+    + '&config=' + encodeURIComponent(b64(JSON.stringify(cfg)));
+}
+function vscodeDeeplink() {
+  const cfg = deeplinkConfig();
+  if (!cfg) return null;
+  cfg.type = 'http';
+  return 'vscode:mcp/install?name='
+    + encodeURIComponent('agent-manager')
+    + '&config=' + encodeURIComponent(JSON.stringify(cfg));
+}
+
 const PLATFORMS = [
   { id:'claude', label:'Claude', title:'Claude Code',
     code(){ const h = token() ? ` \\\n  --header "X-Token: ${token()}"` : '';
@@ -199,6 +229,12 @@ function persist() {
     ? '<span class="okmsg">Token ready.</span>'
     : '<a href="/setup/">Get a free token</a> if you don’t have one.';
   $('cursor-cmd').textContent = cursorCmd();
+  const cl = cursorDeeplink(), vl = vscodeDeeplink();
+  $('deeplink-cursor').href = cl || '/setup/';
+  $('deeplink-vscode').href = vl || '/setup/';
+  $('deeplink-hint').innerHTML = cl
+    ? 'One click opens Cursor / VS Code and adds the brain to its MCP config. The token rides inside the local config, like any MCP key.'
+    : 'Get a token first — then these write <code>~/.cursor/mcp.json</code> / VS Code MCP config via the official install links, no terminal.';
 }
 
 async function copyText(text, btn, okLabel) {

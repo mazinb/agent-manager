@@ -90,6 +90,10 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-14** — One-click connect: `/connect/` now carries real Cursor
+  (`cursor://anysphere.cursor-deeplink/mcp/install`) and VS Code
+  (`vscode:mcp/install`) install links built client-side from the saved
+  token — no terminal. Links fall back to `/setup/` until a token exists.
 - **2026-10-14** — Setup tab becomes the Inbox once a token is saved: notes
   list with project / AI-vs-Human / confidence / stale / ✓-age badges, tap to
   edit inline (human edits badged `origin: human`), New-note form. New
