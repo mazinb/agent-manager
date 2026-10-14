@@ -1,6 +1,6 @@
 {
   "name": "agent-manager-brain",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Shared brain for coding agents — connect, self-host, and query over MCP/REST.",
   "license": "MIT",
   "type": "commonjs",

@@ -36,8 +36,28 @@ Package: **[`agent-manager-brain`](https://www.npmjs.com/package/agent-manager-b
 npx --yes agent-manager-brain connect \
   --url https://bot.getzoro.com \
   --token YOUR_TOKEN \
-  --agent vscode
+  --agent vscode \
+  --project my-repo
 ```
+
+`--project` pins a default project: the written MCP URL carries `?project=`,
+so `search`/`ask` are scoped to that repo's slice. Cross-project lookups are an
+explicit opt-in (omit the pin or pass `project: null`), never the default —
+one agent never leaks context into another repo.
+
+### Trust model (memory you can check)
+
+Agent-written notes are not facts — they carry provenance:
+
+- **confidence** (0–1) and **based_on** source paths, set when the agent writes
+  a note (`note --confidence 0.9 --sources docs/README.md`).
+- **Stale**: if a based-on source changes or is deleted, dependent notes are
+  flagged and excluded from search, answers, and context packs by default
+  (`include_stale: true` opts back in). The MCP `search`/`ask` tools and the
+  Brain page expose `stale`, `confidence`, and last-verified time on every
+  result, so stale memory can't quietly influence decisions.
+- Notes live only in the DB — refresh never wipes them, and a refresh that
+  changes sources marks derived notes stale instead of silently keeping them.
 
 Self-host:
 
@@ -70,6 +90,13 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-14** — Reddit feedback wave 1 (r/mcp): trust metadata on notes
+  (confidence, based_on, verified_at, content_hash), source-change
+  invalidation (stale notes excluded from search/ask/packs, opt-in
+  `include_stale`), per-project scoping (`connect --project` pins `?project=`
+  on the MCP URL; `project=` accepted by search/ask + REST), provenance badges
+  in the Brain page UI. npm 0.3.4 (CLI: `--project`, `--include-stale`,
+  note `--confidence`/`--sources`). Tests: 16 green. Deployed; service restarted.
 - **2026-10-14** — Brain page visual restyle: plain list rows with dividers, no
   emoji, monospace identifiers, markdown rendering in Mentions/Ask, additive
   `mentions` count in `GET /api/entities`. Deployed to main; service restarted.
