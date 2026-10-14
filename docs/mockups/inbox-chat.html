@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Inbox — Agent Manager (mockup)</title>
+<style>
+/* ---- palette: matches static/app.css ---- */
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel-2:#1c2129; --border:#30363d;
+  --fg:#e6edf3; --dim:#8b949e; --faint:#6e7681;
+  --acc:#58a6ff; --acc-dim:#58a6ff33;
+  --ok:#3fb950; --warn:#d29922; --stale:#f58f7f;
+  --bubble-ai:#161b22; --bubble-human:#12261b;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.45 ui-sans-serif,system-ui,sans-serif;overflow:hidden}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+
+/* ---- app shell: mobile = stacked views, desktop = sidebar + chat ---- */
+#app{display:flex;height:100dvh}
+
+/* ===== project list (mobile home / desktop sidebar) ===== */
+#list-view{display:flex;flex-direction:column;width:100%;min-width:0;
+  border-right:1px solid var(--border);background:var(--bg)}
+#list-view .side-head{padding:14px 16px 10px;border-bottom:1px solid var(--border)}
+#list-view .side-head h1{margin:0;font-size:17px;letter-spacing:-.01em}
+#list-view .side-head p{margin:2px 0 0;font-size:12px;color:var(--dim)}
+#proj-list{flex:1;overflow-y:auto;padding:8px}
+.proj{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;
+  padding:11px 12px;border-radius:10px;border:1px solid transparent}
+.proj:hover{background:var(--panel)}
+.proj.on{background:var(--panel);border-color:var(--border)}
+.proj .p-row{display:flex;align-items:baseline;gap:8px}
+.proj .p-name{font-weight:600;font-size:15px}
+.proj .p-count{margin-left:auto;font-size:11px;color:var(--dim);
+  background:var(--panel-2);border:1px solid var(--border);border-radius:999px;padding:1px 8px}
+.proj .p-last{font-size:13px;color:var(--dim);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:100%}
+.proj .p-age{font-size:11px;color:var(--faint)}
+.proj .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.dot.ai{background:var(--acc)}.dot.human{background:var(--ok)}.dot.stale{background:var(--stale)}
+
+/* ===== chat pane ===== */
+#chat-view{display:none;flex:1;min-width:0;flex-direction:column;background:var(--bg)}
+#app.in-chat #chat-view{display:flex}
+#app.in-chat #list-view{display:none}
+
+.chat-head{display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border-bottom:1px solid var(--border);background:#0d1117f2;backdrop-filter:blur(8px);
+  position:sticky;top:0;z-index:10}
+#btn-back{display:flex;align-items:center;gap:4px;color:var(--acc);font-size:14px;
+  padding:6px 8px;border-radius:8px}
+#btn-back:hover{background:var(--acc-dim)}
+.chat-head .c-title{font-weight:650;font-size:15px}
+.chat-head .c-sub{font-size:11px;color:var(--dim);margin-top:1px}
+.chat-head .spacer{margin-left:auto}
+
+#stream{flex:1;overflow-y:auto;padding:16px 12px 8px;
+  scroll-behavior:smooth}
+.day{ text-align:center;font-size:11px;color:var(--faint);margin:14px 0 10px}
+.day span{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:3px 10px}
+
+/* messages */
+.msg{display:flex;flex-direction:column;margin:4px 0;max-width:78%}
+.msg.ai{align-self:flex-start}
+.msg.human{align-self:flex-end;align-items:flex-end}
+.msg .who{font-size:10.5px;color:var(--faint);margin:0 0 2px 4px;letter-spacing:.04em;
+  text-transform:uppercase}
+.msg.human .who{margin-right:4px}
+.bubble{padding:9px 12px;border-radius:14px;font-size:14.5px;line-height:1.5;
+  word-break:break-word;white-space:pre-wrap}
+.msg.ai .bubble{background:var(--bubble-ai);border:1px solid var(--border);
+  border-left:2px solid var(--acc);border-top-left-radius:4px}
+.msg.human .bubble{background:var(--bubble-human);border:1px solid #2ea04344;
+  border-top-right-radius:4px}
+.bubble .b-title{font-weight:600;margin-bottom:2px}
+
+/* badges — subtle, single row under the bubble */
+.meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;
+  font-size:10.5px;color:var(--faint);margin:3px 4px 8px}
+.badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:999px;vertical-align:middle}
+.b-ai{background:#243044;color:#9fb4d4}
+.b-human{background:#1d3a2a;color:#7fd6a4}
+.b-conf{background:#2b2436;color:#c9a7f5}
+.b-ok{background:#1d3a2a;color:#7fd6a4}
+.b-stale{background:#3a1d1d;color:var(--stale)}
+.meta .from{color:var(--faint);font-family:ui-monospace,Menlo,monospace;font-size:10px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+
+/* typing indicator (feel: the brain "responds" when an AI note lands) */
+.typing{display:none;align-self:flex-start;color:var(--dim);font-size:12px;
+  padding:6px 12px;margin:2px 0 6px}
+.typing.on{display:block}
+.typing i{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--dim);
+  margin-right:3px;animation:blink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
+
+/* composer */
+.composer{border-top:1px solid var(--border);background:var(--panel);
+  padding:10px 10px calc(10px + env(safe-area-inset-bottom))}
+.composer .c-row{display:flex;gap:8px;align-items:flex-end}
+#composer-input{flex:1;resize:none;background:var(--bg);border:1px solid var(--border);
+  color:var(--fg);border-radius:12px;padding:10px 12px;font:inherit;line-height:1.45;
+  max-height:120px;min-height:42px}
+#composer-input:focus{outline:none;border-color:var(--acc)}
+#btn-send{flex-shrink:0;width:42px;height:42px;border-radius:12px;background:var(--acc);
+  color:#04121f;display:flex;align-items:center;justify-content:center}
+#btn-send:hover{filter:brightness(1.1)}
+#composer-title{width:100%;margin-bottom:6px;background:var(--bg);border:1px solid var(--border);
+  color:var(--dim);border-radius:8px;padding:6px 10px;font-size:12px}
+#composer-title:focus{outline:none;border-color:var(--acc);color:var(--fg)}
+.composer .hint{font-size:10.5px;color:var(--faint);margin:6px 4px 0}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);
+  background:var(--panel);border:1px solid var(--ok);color:var(--ok);
+  border-radius:10px;padding:8px 14px;font-size:13px;opacity:0;pointer-events:none;
+  transition:opacity .25s;z-index:50}
+.toast.on{opacity:1}
+
+/* ===== desktop ≥880px: sidebar + chat side by side ===== */
+@media (min-width:880px){
+  #list-view{width:300px;flex-shrink:0}
+  #chat-view{display:flex}
+  #btn-back{display:none}
+  #app.in-chat #list-view{display:flex}
+  .chat-head .c-sub{margin-top:0}
+  .chat-head{padding:12px 16px}
+  #stream{padding:20px 24px 8px}
+  .msg{max-width:66%}
+  .composer{padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- ===== sidebar / project list ===== -->
+  <aside id="list-view">
+    <div class="side-head">
+      <h1>Brain Inbox</h1>
+      <p>Projects are folders. Pick one to chat with it.</p>
+    </div>
+    <div id="proj-list"></div>
+  </aside>
+
+  <!-- ===== chat pane ===== -->
+  <main id="chat-view">
+    <div class="chat-head">
+      <button id="btn-back" onclick="closeChat()">&#8592;</button>
+      <div>
+        <div class="c-title" id="chat-title">—</div>
+        <div class="c-sub" id="chat-sub"></div>
+      </div>
+      <div class="spacer"></div>
+    </div>
+    <div id="stream"></div>
+    <div class="typing" id="typing"><i></i><i></i><i></i> brain is noting this…</div>
+    <div class="composer">
+      <input id="composer-title" placeholder="Title (optional — first line is used if empty)">
+      <div class="c-row">
+        <textarea id="composer-input" rows="1"
+          placeholder="Note it in this project…"></textarea>
+        <button id="btn-send" onclick="send()" aria-label="Save note">➤</button>
+      </div>
+      <div class="hint">Saved as a <b>Human</b> note in <span id="hint-proj">—</span>. Enter to send, Shift+Enter for a new line.</div>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast">Saved to the brain.</div>
+
+<script>
+/* =============== demo data — mirrors GET /api/inbox note shape ===============
+   {id, project, title, body, confidence, stale, verified_at, origin, sources}
+   verified_at / ts are seconds-ago offsets so ages look alive. */
+const NOW = Math.floor(Date.now()/1000);
+const notes = [
+  // ---- demo ----
+  {id:1, project:'demo', origin:'ai', title:'Repo layout',
+   body:'demo/ has three entry points: cli.py (argparse), serve.py (uvicorn) and jobs/ cron scripts. Tests live in tests/ and mirror the src tree 1:1.',
+   confidence:0.92, stale:false, verified_at:NOW-3600*5, ts:NOW-3600*5, sources:['demo/README.md']},
+  {id:2, project:'demo', origin:'human', title:'Renamed jobs → scripts',
+   body:'I renamed jobs/ to scripts/ yesterday — update the cron paths.',
+   confidence:null, stale:false, verified_at:NOW-3600*20, ts:NOW-3600*20, sources:[]},
+  {id:3, project:'demo', origin:'ai', title:'Scripts rename absorbed',
+   body:'Noted: jobs/ is now scripts/. Cron entries use scripts/*.sh. Older notes referencing jobs/ should be treated as stale.',
+   confidence:0.88, stale:false, verified_at:NOW-3600*19, ts:NOW-3600*19, sources:['human edit #2']},
+  {id:4, project:'demo', origin:'ai', title:'Python version',
+   body:'Runs on Python 3.12; requirements.txt is pinned, no lockfile.',
+   confidence:0.75, stale:true, verified_at:NOW-86400*21, ts:NOW-86400*21, sources:['demo/pyproject.toml']},
+  // ---- health-ops ----
+  {id:5, project:'health-ops', origin:'ai', title:'Deploy flow',
+   body:'Feature branch → merge to main → push origin/main → systemctl --user restart health-web.service. Never stop at a feature-branch push.',
+   confidence:0.97, stale:false, verified_at:NOW-3600*2, ts:NOW-3600*2,
+   sources:['.cursor/rules/health-merge-main.mdc']},
+  {id:6, project:'health-ops', origin:'ai', title:'Data shape',
+   body:'metrics.json: array of {date, weight_kg, resting_hr, sleep_h}. Missing days are simply absent — do not interpolate.',
+   confidence:0.9, stale:false, verified_at:NOW-86400*3, ts:NOW-86400*3, sources:['scripts/ingest.py']},
+  {id:7, project:'health-ops', origin:'human', title:'Sleep tracker changed',
+   body:'Switched the ring to the new app — sleep_h is now a decimal, not minutes.',
+   confidence:null, stale:false, verified_at:NOW-3600*8, ts:NOW-3600*8, sources:[]},
+  // ---- voice-lab ----
+  {id:8, project:'voice-lab', origin:'ai', title:'GB10 pause rules',
+   body:'Default: image jobs pause qwen-tts only; video pauses qwen-tts + qwen-image. The GLM brain (:8888) is never in the pause set.',
+   confidence:0.95, stale:false, verified_at:NOW-3600*30, ts:NOW-3600*30,
+   sources:['.cursor/rules/gb10-exclusive-gpu.mdc']},
+  {id:9, project:'voice-lab', origin:'ai', title:'TTS queue',
+   body:'Fish runs append a dated row to projects/kids-story/README.md plus a JSON file under benchmarks/. Do not pile old scripts under runs/.',
+   confidence:0.85, stale:false, verified_at:NOW-86400*6, ts:NOW-86400*6,
+   sources:['.cursor/rules/keep-root-clean-and-readmes.mdc']},
+  {id:10, project:'voice-lab', origin:'ai', title:'Minimax backend flag',
+   body:'MINIMAX_H3_BACKEND stays "off" unless explicitly armed; never run a real generate while a book/TTS job is in flight.',
+   confidence:0.8, stale:true, verified_at:NOW-86400*30, ts:NOW-86400*30,
+   sources:['.cursor/rules/gb10-exclusive-gpu.mdc']},
+];
+
+/* =============== helpers =============== */
+const $ = id => document.getElementById(id);
+const esc = s => (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function ago(ts){
+  const s = Math.max(1, Math.floor(Date.now()/1000 - ts));
+  const u = [[86400,'d'],[3600,'h'],[60,'m'],[1,'s']].find(([n]) => s>=n);
+  return Math.floor(s/u[0]) + u[1] + ' ago';
+}
+function dayOf(ts){
+  const d = new Date(ts*1000), t = new Date();
+  const days = Math.floor((t - d) / 86400000);
+  if(days === 0) return 'Today';
+  if(days === 1) return 'Yesterday';
+  return d.toLocaleDateString(undefined, {month:'short', day:'numeric'});
+}
+function badges(n){
+  const o = n.origin === 'human' ? '<span class="badge b-human">Human</span>'
+                                 : '<span class="badge b-ai">AI</span>';
+  const c = n.confidence != null ? '<span class="badge b-conf">conf '+Math.round(n.confidence*100)+'%</span>' : '';
+  const s = n.stale ? '<span class="badge b-stale">STALE</span>'
+                    : '<span class="badge b-ok">✓ ' + ago(n.verified_at) + '</span>';
+  const f = n.sources && n.sources.length ? '<span class="from">from ' + esc(n.sources.join(', ')) + '</span>' : '';
+  return o + c + s + f;
+}
+
+/* =============== project list =============== */
+let OPEN = null;
+function renderList(){
+  const by = {};
+  notes.forEach(n => (by[n.project] = by[n.project] || []).push(n));
+  const el = $('proj-list');
+  el.innerHTML = Object.keys(by).sort().map(p => {
+    const ns = by[p].slice().sort((a,b) => a.ts - b.ts);
+    const last = ns[ns.length-1];
+    const staleCount = ns.filter(n => n.stale).length;
+    const dot = staleCount ? 'stale' : last.origin;
+    return '<button class="proj' + (OPEN===p?' on':'') + '" onclick="openChat(\'' + esc(p) + '\')">' +
+      '<span class="p-row"><span class="p-name"><span class="dot '+dot+'"></span>' + esc(p) + '</span>' +
+      '<span class="p-count">' + ns.length + (staleCount ? ' · ' + staleCount + ' stale' : '') + '</span></span>' +
+      '<span class="p-last">' + esc(last.title) + '</span>' +
+      '<span class="p-age">' + ago(last.ts) + '</span>' +
+    '</button>';
+  }).join('');
+}
+
+/* =============== chat =============== */
+function renderChat(){
+  const proj = OPEN;
+  $('chat-title').textContent = proj;
+  $('hint-proj').textContent = proj;
+  const ns = notes.filter(n => n.project === proj).sort((a,b) => a.ts - b.ts);
+  $('chat-sub').textContent = ns.length + ' notes · newest at the bottom';
+  const st = $('stream');
+  let html = '', lastDay = '';
+  ns.forEach(n => {
+    const d = dayOf(n.ts);
+    if(d !== lastDay){ html += '<div class="day"><span>' + d + '</span></div>'; lastDay = d; }
+    html +=
+      '<div class="msg ' + n.origin + '">' +
+        '<div class="who">' + (n.origin==='human' ? 'You' : 'Brain') + '</div>' +
+        '<div class="bubble"><span class="b-title">' + esc(n.title) + '</span>' +
+        (n.body ? '\n' + esc(n.body) : '') + '</div>' +
+        '<div class="meta">' + badges(n) + '</div>' +
+      '</div>';
+  });
+  st.innerHTML = html;
+  st.scrollTop = st.scrollHeight;
+}
+function openChat(p){
+  OPEN = p;
+  $('app').classList.add('in-chat');
+  renderList(); renderChat();
+  $('composer-input').focus();
+}
+function closeChat(){
+  OPEN = null;
+  $('app').classList.remove('in-chat');
+  renderList();
+}
+
+/* =============== composer =============== */
+function send(){
+  const body = $('composer-input').value.trim();
+  if(!body || !OPEN) return;
+  const title = $('composer-title').value.trim() || body.split('\n')[0].slice(0, 60);
+  notes.push({
+    id: Date.now(), project: OPEN, origin: 'human', title,
+    body, confidence: null, stale: false,
+    verified_at: Math.floor(Date.now()/1000), ts: Math.floor(Date.now()/1000), sources: [],
+  });
+  $('composer-input').value = ''; $('composer-title').value = '';
+  $('typing').classList.add('on');
+  renderChat();
+  // in the real page this is the POST /api/note round-trip; here we just feel the flow
+  setTimeout(() => { $('typing').classList.remove('on'); $('toast').classList.add('on');
+    setTimeout(() => $('toast').classList.remove('on'), 1800); }, 700);
+  renderList();
+}
+$('composer-input').addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+});
+$('composer-input').addEventListener('input', e => {
+  e.target.style.height = 'auto';
+  e.target.style.height = Math.min(120, e.target.scrollHeight) + 'px';
+});
+
+/* =============== boot: open the busiest project =============== */
+renderList();
+openChat('voice-lab');
+if(window.innerWidth < 880) closeChat();
+</script>
+</body>
+</html>

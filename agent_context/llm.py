@@ -3,6 +3,31 @@ import json
 import urllib.request
 
 
+def chat(base_url, model, system, user, timeout=180, api_key="",
+         max_tokens=1200):
+    """One generic chat completion; returns content text or None on failure."""
+    if not base_url:
+        return None
+    body = json.dumps({
+        "model": model,
+        "messages": [{"role": "system", "content": system},
+                     {"role": "user", "content": user}],
+        "max_tokens": max_tokens,
+        "temperature": 0.2,
+        "chat_template_kwargs": {"thinking": False},
+    }).encode()
+    req = urllib.request.Request(
+        base_url.rstrip("/") + "/chat/completions", data=body,
+        headers={"Content-Type": "application/json",
+                 **({"Authorization": "Bearer " + api_key} if api_key else {})})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+        return (data["choices"][0]["message"]["content"] or "").strip()
+    except Exception:
+        return None
+
+
 def ask(base_url, model, question, chunks, timeout=120, api_key=""):
     """Synthesize an answer grounded in chunks; returns text or None."""
     if not chunks:

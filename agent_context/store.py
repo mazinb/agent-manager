@@ -53,6 +53,9 @@ TRUST_COLUMNS = (
     ("stale", "INTEGER DEFAULT 0"),
     ("based_on", "TEXT"),
     ("origin", "TEXT DEFAULT 'ai'"),
+    # Grok-style multi-agent: who wrote the note, and who they messaged.
+    ("agent", "TEXT DEFAULT ''"),
+    ("to_agent", "TEXT DEFAULT ''"),
 )
 
 
@@ -64,6 +67,9 @@ def _ensure_trust_columns(con):
     con.execute(
         "CREATE TABLE IF NOT EXISTS project_visibility ("
         "project TEXT PRIMARY KEY, visibility TEXT NOT NULL DEFAULT 'private')")
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS project_config ("
+        "project TEXT PRIMARY KEY, config TEXT NOT NULL DEFAULT '{}')")
     con.commit()
 
 
@@ -136,20 +142,35 @@ def upsert_source(con, path, kind, project, mtime, size, text_chunks):
     return sid
 
 
-def set_note_meta(con, sid, confidence=None, based_on=None, origin=None):
+def set_note_meta(con, sid, confidence=None, based_on=None, origin=None,
+                  agent=None, to_agent=None):
     """Trust metadata for a note: (re)saving refreshes verified_at and clears
     the stale flag. based_on: list of source paths the note was derived from.
-    origin: 'ai' (agent-written, default) or 'human' (edited by a person)."""
+    origin: 'ai' (agent-written, default) or 'human' (edited by a person).
+    agent / to_agent: Grok-style peer labels (e.g. hermes → gorkbot)."""
     if origin is not None and origin not in ("ai", "human"):
         raise ValueError("origin must be 'ai' or 'human'")
-    con.execute(
-        "UPDATE sources SET verified_at=?, stale=0, confidence=?, based_on=?"
-        + (", origin=?" if origin is not None else "") + " WHERE id=?",
-        ((time.time(), confidence,
-          json.dumps(based_on) if based_on else None,
-          origin, sid) if origin is not None else
-         (time.time(), confidence,
-          json.dumps(based_on) if based_on else None, sid)))
+    sets = ["verified_at=?", "stale=0", "confidence=?", "based_on=?"]
+    args = [time.time(), confidence,
+            json.dumps(based_on) if based_on else None]
+    if origin is not None:
+        sets.append("origin=?")
+        args.append(origin)
+    if agent is not None:
+        sets.append("agent=?")
+        args.append(_slug_agent(agent))
+    if to_agent is not None:
+        sets.append("to_agent=?")
+        args.append(_slug_agent(to_agent))
+    args.append(sid)
+    con.execute("UPDATE sources SET " + ", ".join(sets) + " WHERE id=?", args)
+
+
+def _slug_agent(name):
+    """Short stable agent label: letters, digits, ._- only."""
+    import re
+    s = re.sub(r"[^a-z0-9._-]+", "-", (name or "").lower()).strip("-.")[:48]
+    return s
 
 
 def flag_stale_for_sources(con, changed_paths):
@@ -175,13 +196,124 @@ def flag_stale_for_sources(con, changed_paths):
     return n
 
 
+def get_autonote_config(con, project):
+    """Stored auto-note config for a project ({} when unset)."""
+    row = con.execute("SELECT config FROM project_config WHERE project=?",
+                      (project,)).fetchone()
+    if not row:
+        return {}
+    try:
+        cfg = json.loads(row["config"])
+    except (ValueError, TypeError):
+        return {}
+    return cfg if isinstance(cfg, dict) else {}
+
+
+def set_autonote_config(con, project, config):
+    """Store the auto-note config dict for a project (JSON-encoded)."""
+    if not isinstance(config, dict):
+        raise ValueError("config must be a dict")
+    con.execute(
+        "INSERT INTO project_config(project, config) VALUES(?,?) "
+        "ON CONFLICT(project) DO UPDATE SET config=excluded.config",
+        (project, json.dumps(config)))
+    con.commit()
+
+
+def get_summary(con, project):
+    """The pinned auto-summary note for a project, or None.
+
+    Stored as kind='summary' (path summary:<project>) so it never mixes into
+    list_notes(); body is reassembled from chunks like a note."""
+    row = con.execute(
+        "SELECT id, verified_at, based_on, origin FROM sources "
+        "WHERE kind='summary' AND path=?", (f"summary:{project}",)).fetchone()
+    if not row:
+        return None
+    chunks = con.execute(
+        "SELECT text FROM chunks WHERE source_id=? ORDER BY ord",
+        (row["id"],)).fetchall()
+    try:
+        based_on = json.loads(row["based_on"]) if row["based_on"] else []
+    except (ValueError, TypeError):
+        based_on = []
+    return {
+        "project": project,
+        "body": "\n\n".join(c["text"] for c in chunks),
+        "verified_at": row["verified_at"],
+        "based_on": based_on,
+        "origin": row["origin"] or "ai",
+    }
+
+
+def set_summary(con, project, body, based_on=None, origin="ai"):
+    """Write/replace the project summary. origin='human' protects it from
+    auto-overwrite (see autonote.refresh)."""
+    if origin not in ("ai", "human"):
+        raise ValueError("origin must be 'ai' or 'human'")
+    sid = upsert_source(con, f"summary:{project}", "summary", project,
+                        0, len(body), [("Summary", body.strip())])
+    set_note_meta(con, sid, confidence=None, based_on=based_on, origin=origin)
+    con.commit()
+    return sid
+
+
+def list_projects(con):
+    """Inbox home rows: one per project with activity ordering and a
+    one-line preview. last_ts = newest note or summary verified_at;
+    projects with only source files (no notes/summary) sort last."""
+    projects = [r["project"] for r in con.execute(
+        "SELECT DISTINCT project FROM sources "
+        "WHERE project NOT IN ('', '(system)') ORDER BY project")]
+    rows = []
+    for project in projects:
+        last = con.execute(
+            "SELECT MAX(verified_at) FROM sources WHERE project=? "
+            "AND kind IN ('note','summary')", (project,)).fetchone()[0]
+        note = con.execute(
+            "SELECT id, origin FROM sources WHERE project=? AND kind='note' "
+            "ORDER BY verified_at DESC, id DESC LIMIT 1",
+            (project,)).fetchone()
+        preview, last_origin = "", None
+        if note:
+            last_origin = note["origin"] or "ai"
+            texts = con.execute(
+                "SELECT text FROM chunks WHERE source_id=? ORDER BY ord",
+                (note["id"],)).fetchall()
+            body = "\n".join(t["text"] for t in texts)
+            for line in body.splitlines():
+                line = line.strip()
+                if line.startswith("# "):
+                    continue  # the note's own title
+                if line:
+                    preview = line
+                    break
+        count = con.execute(
+            "SELECT COUNT(*) FROM sources WHERE project=? AND kind='note'",
+            (project,)).fetchone()[0]
+        rows.append({
+            "project": project,
+            "last_ts": last or 0,
+            "preview": preview[:140],
+            "note_count": count,
+            "last_origin": last_origin,
+            "has_summary": get_summary(con, project) is not None,
+        })
+    rows.sort(key=lambda r: (-r["last_ts"], r["project"]))
+    return rows
+
+
 def list_notes(con, project=None):
     """Inbox rows: every kind='note' source with title, body and trust
     badges. Title is parsed from the path (note:project/title); the body is
     reassembled from chunks (long notes are chunked, so this is a faithful
-    rejoin, not a copy). Ordered newest-verified first."""
+    rejoin, not a copy). Ordered newest-verified first.
+
+    `sources` is an alias of based_on (Grok inbox mockup / UI). `agent` and
+    `to_agent` power the Messaged ● peer lines between bubbles."""
     sql = ("SELECT id, path, project, size, verified_at, confidence,"
-           " stale, based_on, origin FROM sources WHERE kind='note'")
+           " stale, based_on, origin, agent, to_agent FROM sources "
+           "WHERE kind='note'")
     args = ()
     if project:
         sql += " AND project=?"
@@ -203,12 +335,34 @@ def list_notes(con, project=None):
         except (ValueError, TypeError):
             based_on = []
         notes.append({
+            "id": r["id"],
             "project": r["project"], "title": title, "body": body,
             "confidence": r["confidence"], "verified_at": r["verified_at"],
-            "stale": r["stale"], "based_on": based_on,
+            "stale": r["stale"], "based_on": based_on, "sources": based_on,
             "origin": r["origin"] or "ai",
+            "agent": r["agent"] or "",
+            "to_agent": r["to_agent"] or "",
         })
     return notes
+
+
+def list_agents(con):
+    """Distinct agent peers that have written or been messaged — feeds the
+    Grok-style agents menu overlay."""
+    rows = con.execute(
+        "SELECT agent AS name, COUNT(*) AS n FROM sources "
+        "WHERE kind='note' AND agent != '' GROUP BY agent "
+        "UNION ALL "
+        "SELECT to_agent AS name, COUNT(*) AS n FROM sources "
+        "WHERE kind='note' AND to_agent != '' GROUP BY to_agent"
+    ).fetchall()
+    by = {}
+    for r in rows:
+        name = r["name"]
+        if not name:
+            continue
+        by[name] = by.get(name, 0) + r["n"]
+    return [{"agent": k, "notes": by[k]} for k in sorted(by, key=lambda a: (-by[a], a))]
 
 
 def prune_stale(con, live_paths):
@@ -218,7 +372,8 @@ def prune_stale(con, live_paths):
     Returns the list of removed paths (empty list if none)."""
     rows = con.execute("SELECT id, path, kind FROM sources").fetchall()
     gone = [r["path"] for r in rows
-            if r["kind"] != "note" and r["path"] not in live_paths]
+            if r["kind"] not in ("note", "summary")
+            and r["path"] not in live_paths]
     for path in gone:
         sid = con.execute("SELECT id FROM sources WHERE path=?", (path,)).fetchone()[0]
         con.execute("DELETE FROM chunks_fts WHERE rowid IN "

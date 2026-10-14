@@ -88,13 +88,74 @@ def _note(brain, args):
     origin = args.get("origin") or "ai"
     if origin not in ("ai", "human"):
         raise ValueError("origin must be 'ai' or 'human'")
+    agent = (args.get("agent") or "").strip()
+    to_agent = (args.get("to_agent") or "").strip()
     sid = store.upsert_source(
         brain.con, f"note:{project}/{title}", "note", project,
         time.time(), len(body), _chunk_markdown(f"# {title}\n\n{body}"))
     store.set_note_meta(brain.con, sid, confidence=confidence,
-                        based_on=based_on, origin=origin)
+                        based_on=based_on, origin=origin,
+                        agent=agent or None, to_agent=to_agent or None)
     brain.con.commit()
-    return {"ok": True, "project": project, "title": title}
+    out = {"ok": True, "project": project, "title": title}
+    if agent:
+        out["agent"] = store._slug_agent(agent)
+    if to_agent:
+        out["to_agent"] = store._slug_agent(to_agent)
+    return out
+
+
+def _list_projects(brain, args):
+    """Inbox rows: per-project latest activity, preview, note count."""
+    from . import store
+    return {"projects": store.list_projects(brain.con)}
+
+
+def _get_project_summary(brain, args):
+    from . import store
+    project = re.sub(r"[^a-z0-9._-]", "-", (args.get("project") or "").lower())[:64]
+    if not project:
+        raise ValueError("project is required")
+    return store.get_summary(brain.con, project) or {"error": "no summary yet",
+                                                     "project": project}
+
+
+def _refresh_project_summary(brain, args):
+    from . import autonote
+    return autonote.refresh(brain, args.get("project") or "",
+                            force=bool(args.get("force")))
+
+
+def _get_autonote_config(brain, args):
+    from . import autonote
+    project = (args.get("project") or "").strip()
+    if not project:
+        raise ValueError("project is required")
+    return autonote.resolve_config(brain.con, project)
+
+
+def _set_autonote_config(brain, args):
+    from . import autonote, store
+    project = (args.get("project") or "").strip()
+    if not project:
+        raise ValueError("project is required")
+    cfg = autonote.normalize_config(args.get("config"))
+    store.set_autonote_config(brain.con, project, cfg)
+    return {"ok": True, "project": project, "config": cfg}
+
+
+def _add_note(brain, args):
+    """Thin alias for note(): text only, title derived from the first line."""
+    text = (args.get("text") or "").strip()
+    if not text:
+        raise ValueError("text is required")
+    title = (text.splitlines()[0].strip() or "note")
+    if len(title) > 60:
+        title = title[:57] + "..."
+    args = dict(args)
+    args["title"] = args.get("title") or title
+    args["body"] = text
+    return _note(brain, args)
 
 
 TOOLS = [
@@ -137,10 +198,54 @@ TOOLS = [
          "sources": {"type": "array", "items": {"type": "string"},
                      "description": "Repo paths the note is derived from, e.g. [\"README.md\"]."}},
          "required": ["project", "body"]}},
+    {"name": "add_note", "description": "Write a quick note into a project's "
+     "thread (title is taken from the first line of text). Same as note() "
+     "but simpler.",
+     "inputSchema": {"type": "object", "properties": {
+         "project": {"type": "string"}, "text": {"type": "string"},
+         "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+         "sources": {"type": "array", "items": {"type": "string"}}},
+         "required": ["project", "text"]}},
+    {"name": "list_projects", "description": "Inbox-style rows: one per "
+     "project with its latest activity, a one-line preview and note count.",
+     "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "get_project_summary", "description": "The pinned auto-summary "
+     "note for a project (or an error when none exists yet).",
+     "inputSchema": {"type": "object", "properties": {
+         "project": {"type": "string"}}, "required": ["project"]}},
+    {"name": "refresh_project_summary", "description": "Regenerate the "
+     "project summary from its sources, notes and local repo. Set force=true "
+     "to replace a human-edited summary; otherwise returns "
+     "status=human_edited with old and new versions for a diff prompt.",
+     "inputSchema": {"type": "object", "properties": {
+         "project": {"type": "string"}, "force": {"type": "boolean",
+                                                  "default": False}},
+         "required": ["project"]}},
+    {"name": "get_autonote_config", "description": "The auto-note config for "
+     "a project (sections, instruction, sources, trigger, max length).",
+     "inputSchema": {"type": "object", "properties": {
+         "project": {"type": "string"}}, "required": ["project"]}},
+    {"name": "set_autonote_config", "description": "Store the auto-note "
+     "config for a project. Same config the Setup UI edits.",
+     "inputSchema": {"type": "object", "properties": {
+         "project": {"type": "string"},
+         "config": {"type": "object", "properties": {
+             "enabled": {"type": "boolean"},
+             "sections": {"type": "array", "items": {"type": "string"}},
+             "instruction": {"type": "string"},
+             "sources": {"description": "'auto' or a list of paths"},
+             "trigger": {"type": "string",
+                         "enum": ["on_push", "daily", "manual"]},
+             "max_words": {"type": "integer"}}},
+         },
+         "required": ["project", "config"]}},
 ]
 
 TOOL_FUNCS = {t["name"]: f for t, f in zip(
-    TOOLS, [_search, _ask, _entity, _context_pack, _projects, _stats, _note])}
+    TOOLS, [_search, _ask, _entity, _context_pack, _projects, _stats, _note,
+            _add_note, _list_projects, _get_project_summary,
+            _refresh_project_summary, _get_autonote_config,
+            _set_autonote_config])}
 
 
 def handle(brain, msg):

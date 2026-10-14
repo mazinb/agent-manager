@@ -27,6 +27,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
 from agent_context import github_login, llm, mcp, query, store  # noqa: E402
+from agent_context import autonote  # noqa: E402
 from agent_context.server import Brain  # noqa: E402
 
 STATIC = os.path.join(ROOT, "static")
@@ -342,6 +343,33 @@ class Handler(BaseHTTPRequestHandler):
             project = (q.get("project") or [None])[0] or None
             return self._json(200,
                               {"notes": store.list_notes(BRAIN.con, project)})
+        if path == "/api/inbox/projects":
+            return self._json(200, {"projects": store.list_projects(
+                BRAIN.con)})
+        if path == "/api/inbox/thread":
+            project = (q.get("project") or [""])[0].strip()
+            if not project:
+                return self._json(400, {"error": "project required"})
+            notes = store.list_notes(BRAIN.con, project)
+            notes.reverse()  # newest-last, like a chat
+            return self._json(200, {
+                "project": project,
+                "summary": store.get_summary(BRAIN.con, project),
+                "notes": notes,
+                "config": autonote.resolve_config(BRAIN.con, project),
+            })
+        if path == "/api/autonote/config":
+            project = (q.get("project") or [""])[0].strip()
+            if not project:
+                return self._json(400, {"error": "project required"})
+            return self._json(200, autonote.resolve_config(
+                BRAIN.con, project))
+        if path == "/api/inbox/projects":
+            return self._json(200,
+                              {"projects": store.list_projects(BRAIN.con)})
+        if path == "/api/inbox/agents":
+            return self._json(200,
+                              {"agents": store.list_agents(BRAIN.con)})
         if path == "/api/stats":
             return self._json(200, query.stats(BRAIN.con))
         if path == "/api/search":
