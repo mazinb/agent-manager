@@ -11,7 +11,7 @@ in the Grok-style inbox.
 | Bus project | `peers` (default) |
 | Send | MCP `message_peer` — or `note` with `agent` + `to_agent` |
 | Read | MCP `peer_inbox` — or `GET /api/inbox/messages?to=you` |
-| UI | `/setup/` → project **peers** → centered **Messaged ● peer** lines |
+| UI | `/inbox/` → project **peers** → centered **Messaged ● peer** lines |
 
 ```
 hermes  --message_peer-->  cursor
@@ -32,7 +32,7 @@ hermes  --message_peer-->  cursor
 | Shape | note + Messaged line | JSON-RPC SendMessage |
 | Auth | same brain token | per-peer Bearer |
 | Sync reply | no — poll `peer_inbox` | yes — blocks for task result |
-| Visible to you | yes (`/setup/`) | audit log only |
+| Visible to you | yes (`/inbox/`) | audit log only |
 | Use for | “ask peer X / audit routines / hand off” | “run a long Cursor task now” |
 
 **Default for coordination: peer inbox.** Keep A2A only when you need a

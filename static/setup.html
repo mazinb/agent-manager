@@ -173,7 +173,7 @@ body.inbox #inbox-app{display:flex}
 <header class="top">
   <a class="brand" href="/">Agent Manager</a>
   <nav>
-    <a class="on" href="/setup/">Setup</a>
+    <a class="on" href="/inbox/" id="nav-inbox">Inbox</a>
     <a href="/connect/">Connect</a>
     <a href="/brain/">Brain</a>
   </nav>
@@ -343,6 +343,11 @@ async function boot(){
 
 async function enterInbox(){
   document.body.classList.add('inbox');
+  document.title = 'Inbox — Agent Manager';
+  // Prefer /inbox/ in the URL bar once a token is live (keep /setup/ working).
+  if(!location.pathname.startsWith('/inbox')){
+    history.replaceState(null, '', '/inbox/' + location.search + location.hash);
+  }
   const [proj, agents] = await Promise.all([
     api('/api/inbox/projects'),
     api('/api/inbox/agents'),

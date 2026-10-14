@@ -13,7 +13,7 @@ Self-hosted. Stdlib-only Python. One process.
 | Path | Purpose |
 |---|---|
 | [`/`](https://bot.getzoro.com/) | Public landing |
-| [`/setup/`](https://bot.getzoro.com/setup/) | Create or save an access token |
+| [`/inbox/`](https://bot.getzoro.com/inbox/) | Inbox (token onboarding if needed; `/setup/` still works) |
 | [`/connect/`](https://bot.getzoro.com/connect/) | One-click MCP setup |
 | `/brain/` | Ask / entities / context packs |
 | `/mcp` | Streamable HTTP MCP |
@@ -90,6 +90,9 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — Nav/URL say **Inbox** after login (`/inbox/` alias;
+  `/setup/` still serves the same page and rewrites the path once a token
+  is present).
 - **2026-10-15** — Peer inbox (simpler than A2A): MCP `message_peer` /
   `peer_inbox` + `GET /api/inbox/messages` on the shared `peers` bus. Prefer
   this for agent coordination; keep A2A only for sync workers. Docs:

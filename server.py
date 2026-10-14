@@ -3,7 +3,7 @@
 
 One process on :8075:
   /                 Public landing
-  /setup/           Token onboarding
+  /setup/           Token onboarding (alias: /inbox/ — inbox UI once logged in)
   /connect/         One-click MCP connect docs
   /brain/           Shared brain UI
   /api/*            JSON API (token)
@@ -283,8 +283,8 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html", "/home"):
             return self._file(os.path.join(STATIC, "home.html"),
                               "text/html; charset=utf-8", cache=EDGE)
-        if path in ("/setup", "/setup/"):
-            # Setup can mint tokens — keep browser-fresh, still allow brief CDN.
+        if path in ("/setup", "/setup/", "/inbox", "/inbox/"):
+            # Token mint + inbox UI (same page; client swaps label/URL after login).
             return self._file(os.path.join(STATIC, "setup.html"),
                               "text/html; charset=utf-8",
                               cache="public, max-age=60, s-maxage=300")
