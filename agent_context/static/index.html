@@ -282,10 +282,17 @@ async function ask() {
   $('#answer').innerHTML = d.answer
     ? `<div class="card"><div class="meta">grounded answer</div><div class="answer">${esc(d.answer)}</div></div>`
     : '';
-  $('#results').innerHTML = (d.results || []).map(r =>
-    `<div class="card"><div class="meta">${esc(r.project || '')} · ${esc(r.kind)} · ${esc(r.path)}</div>
-     ${r.heading ? `<b>${esc(r.heading)}</b><br>` : ''}${esc((r.text || '').slice(0, 600))}</div>`
-  ).join('');
+  $('#results').innerHTML = (d.results || []).map(r => {
+    let t = r.text || '';
+    if (r.heading) {
+      const m = t.match(/^#{1,6}\s+(.+?)(?:\n|$)/);
+      if (m && m[1].trim().toLowerCase() === String(r.heading).trim().toLowerCase()) {
+        t = t.slice(m[0].length);
+      }
+    }
+    return `<div class="card"><div class="meta">${esc(r.project || '')} · ${esc(r.kind)} · ${esc(r.path)}</div>
+     ${r.heading ? `<b>${esc(r.heading)}</b><br>` : ''}${esc(t.slice(0, 600))}</div>`;
+  }).join('');
 }
 
 async function loadPack() {

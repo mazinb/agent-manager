@@ -1,10 +1,27 @@
 """Query: FTS search + entity expansion + context packs + optional LLM answer."""
 import re
 
+_HEADING_LINE = re.compile(r"^#{1,6}\s+(.*)$")
+
 
 def _fts_expr(q):
     terms = re.findall(r"[\w.-]+", q)
     return " OR ".join('"%s"' % t for t in terms if t)
+
+
+def _body_without_heading(text, heading):
+    """Drop a leading markdown heading that duplicates the stored heading.
+
+    Older ingest kept `# Title` inside chunk text while also storing
+    heading='Title'; packs then prefixed `## Title` again.
+    """
+    if not text or not heading:
+        return text or ""
+    lines = text.splitlines()
+    m = _HEADING_LINE.match(lines[0])
+    if m and m.group(1).strip().casefold() == heading.strip().casefold():
+        return "\n".join(lines[1:]).lstrip("\n")
+    return text
 
 
 def search(con, q, limit=12):
@@ -71,7 +88,11 @@ def context_pack(con, project, max_chars=6000):
         "ELSE 7 END, s.path, c.ord", (project,)).fetchall()
     budget = max_chars
     for r in rows:
-        block = f"## {r['heading']}\n{r['text']}\n" if r["heading"] else r["text"] + "\n"
+        text = _body_without_heading(r["text"] or "", r["heading"] or "")
+        if r["heading"]:
+            block = f"## {r['heading']}\n{text}\n" if text else f"## {r['heading']}\n"
+        else:
+            block = text + "\n"
         if len(block) > budget:
             block = block[:budget] + "\n…\n"
         if budget <= 0:

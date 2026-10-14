@@ -40,9 +40,9 @@ def _chunk_markdown(text, max_len=1400):
         m = HEADING_RE.match(line)
         if m:
             flush()
+            # Heading is stored separately — do not also keep the `# …` line
+            # in the body (context_pack / UI / LLM re-attach it).
             heading = m.group(2).strip()
-            buf.append(line)
-            buf_len += len(line)
             continue
         if buf_len + len(line) > max_len:
             flush()

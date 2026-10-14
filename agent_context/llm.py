@@ -7,8 +7,10 @@ def ask(base_url, model, question, chunks, timeout=120, api_key=""):
     """Synthesize an answer grounded in chunks; returns text or None."""
     if not chunks:
         return None
+    from agent_context.query import _body_without_heading
     ctx = "\n\n".join(
-        f"[{i+1}] ({c['project']}/{c['kind']}) {c['heading']}\n{c['text']}"
+        f"[{i+1}] ({c['project']}/{c['kind']}) {c['heading']}\n"
+        f"{_body_without_heading(c.get('text') or '', c.get('heading') or '')}"
         for i, c in enumerate(chunks[:10]))
     prompt = (
         "You are a retrieval assistant over a personal knowledge base. "
