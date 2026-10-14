@@ -90,6 +90,8 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — Cursor↔Hermes loop on peers bus: plan → handoff →
+  supervise (`docs/PEER-INBOX.md`, `scripts/peer.sh`). Hermes skill updated.
 - **2026-10-15** — UI rebrand **Zoro**: one shared 48px header on Home /
   Inbox / Connect / Brain (no chrome hop). Minimal copy.
 - **2026-10-15** — Nav/URL say **Inbox** after login (`/inbox/` alias;
