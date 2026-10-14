@@ -308,9 +308,6 @@ class Handler(BaseHTTPRequestHandler):
                 "auth": "X-Token or Authorization: Bearer",
             })
 
-        if not self._authed():
-            return self._json(401, {"error": "unauthorized"})
-
         if path == "/api/auth/github/start":
             if not github_login.configured(ENV):
                 return self._json(503,
@@ -337,6 +334,9 @@ class Handler(BaseHTTPRequestHandler):
                 "Signed in as " + login,
                 f"localStorage.setItem('am_token', {json.dumps(raw)});"
                 "location.href = '/brain/';")
+
+        if not self._authed():
+            return self._json(401, {"error": "unauthorized"})
 
         if path == "/api/inbox":
             project = (q.get("project") or [None])[0] or None
