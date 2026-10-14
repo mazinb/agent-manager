@@ -6,7 +6,6 @@ One process on :8075:
   /setup/           Token onboarding (bootstrap / signup / paste)
   /connect/         Public one-click agent connect docs
   /brain/           Shared brain UI
-  /agents/          Optional helper chat UI
   /api/*            JSON API (token)
   /mcp              Streamable HTTP MCP (token on POST)
 
@@ -314,8 +313,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._file(os.path.join(STATIC, "connect.html"),
                               "text/html; charset=utf-8")
         if path in ("/agents", "/agents/"):
-            return self._file(os.path.join(STATIC, "agents.html"),
-                              "text/html; charset=utf-8")
+            self.send_response(301)
+            self.send_header("Location", "/brain/")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if path in ("/brain", "/brain/"):
             return self._file(os.path.join(BRAIN_STATIC, "index.html"),
                               "text/html; charset=utf-8")

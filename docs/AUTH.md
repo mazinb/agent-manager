@@ -8,7 +8,7 @@ not need a Cursor account or a password form.
 | Surface | Auth |
 |---|---|
 | `/`, `/setup/`, `/connect/` | Public |
-| `/brain/`, `/agents/` | Public HTML; APIs require token |
+| `/brain/` | Public HTML; APIs require token |
 | `/api/*`, `POST /mcp` | `X-Token` or `Authorization: Bearer` |
 
 ### Token sources

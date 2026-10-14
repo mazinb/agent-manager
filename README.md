@@ -16,7 +16,6 @@ Self-hosted. Stdlib-only Python. One process.
 | [`/setup/`](https://bot.getzoro.com/setup/) | Create or save an access token |
 | [`/connect/`](https://bot.getzoro.com/connect/) | One-click copy setup for every major agent |
 | `/brain/` | Ask / entities / context packs |
-| `/agents/` | Optional helper chat UI |
 | `/mcp` | Streamable HTTP MCP |
 | `/api/*` | JSON API |
 
@@ -94,7 +93,6 @@ Optional invite gate: `SETUP_INVITE_CODE=…`
 static/home.html             public landing
 static/setup.html            token onboarding
 static/connect.html          one-click setup UI
-static/agents.html           helper chat UI
 agent_context/               brain library
 server.py                    unified HTTP process
 docs/CONNECT.md              per-platform instructions
