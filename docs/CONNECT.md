@@ -8,7 +8,8 @@ Base URL examples:
 MCP endpoint: `{BASE}/mcp`  
 Auth header: `X-Token: YOUR_TOKEN` (or `Authorization: Bearer YOUR_TOKEN`)
 
-Fastest path: open **`{BASE}/connect/`**, paste your token, pick a platform, **Copy**.
+1. Get a token at **`{BASE}/setup/`** (create on first run, or paste one you have)  
+2. Open **`{BASE}/connect/`**, paste the token, pick a platform, **Copy**
 
 ---
 

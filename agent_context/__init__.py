@@ -5,4 +5,4 @@ resolve entities into a graph, answer queries with citations,
 and speak MCP.
 """
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"

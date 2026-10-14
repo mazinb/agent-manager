@@ -2,22 +2,26 @@
 """Agent manager — unified dashboard + shared brain + MCP.
 
 One process on :8075:
-  /                 Hermes helper chat UI
+  /                 Public landing
+  /setup/           Token onboarding (bootstrap / signup / paste)
+  /connect/         Public one-click agent connect docs
   /brain/           Shared brain UI
-  /api/agents|chat|history   chat API
-  /api/stats|search|ask|…    brain API
-  /mcp              streamable HTTP MCP
+  /agents/          Optional helper chat UI
+  /api/*            JSON API (token)
+  /mcp              Streamable HTTP MCP (token on POST)
 
-Auth: single X-Token / Bearer vs AGENT_MANAGER_TOKEN (.env).
-No public /space — private brain only.
+Auth: AGENT_MANAGER_TOKEN (.env) and/or hashed tokens in data/tokens.json.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -31,6 +35,7 @@ from agent_context.server import Brain  # noqa: E402
 STATIC = os.path.join(ROOT, "static")
 BRAIN_STATIC = os.path.join(ROOT, "agent_context", "static")
 DATA = os.path.join(ROOT, "data")
+TOKENS_PATH = os.path.join(DATA, "tokens.json")
 PROFILES = os.path.expanduser("~/.hermes/profiles")
 HERMES = os.path.expanduser("~/.local/bin/hermes")
 CHAT_TIMEOUT = int(os.environ.get("CHAT_TIMEOUT", "420"))
@@ -38,8 +43,11 @@ CONFIG_PATH = os.environ.get(
     "AGENT_MANAGER_CONFIG",
     os.path.expanduser("~/.config/agent-manager/config.json"),
 )
-# Fall back to legacy agent-context config during migration
 LEGACY_CONFIG = os.path.expanduser("~/.config/agent-context/config.json")
+ALLOW_PUBLIC_SIGNUP = os.environ.get("ALLOW_PUBLIC_SIGNUP", "").lower() in (
+    "1", "true", "yes", "on")
+SETUP_INVITE_CODE = os.environ.get("SETUP_INVITE_CODE", "").strip()
+_TOKEN_LOCK = threading.Lock()
 
 META_RE = re.compile(
     r"^(Session|Title|Duration|Messages|Cost|Model):.*$", re.MULTILINE)
@@ -74,10 +82,105 @@ def load_brain_config():
 
 
 ENV = load_env()
-TOKEN = ENV.get("AGENT_MANAGER_TOKEN", "") or os.environ.get(
+ADMIN_TOKEN = ENV.get("AGENT_MANAGER_TOKEN", "") or os.environ.get(
     "AGENT_MANAGER_TOKEN", "")
 BRAIN_CFG = load_brain_config()
 BRAIN = Brain(BRAIN_CFG)
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def load_tokens():
+    if not os.path.isfile(TOKENS_PATH):
+        return []
+    try:
+        with open(TOKENS_PATH) as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def save_tokens(rows):
+    os.makedirs(DATA, exist_ok=True)
+    tmp = TOKENS_PATH + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(rows, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, TOKENS_PATH)
+
+
+def configured() -> bool:
+    return bool(ADMIN_TOKEN) or bool(load_tokens())
+
+
+def setup_status():
+    return {
+        "bootstrap": not configured(),
+        "signup_open": bool(ALLOW_PUBLIC_SIGNUP) and configured(),
+        "invite_required": bool(SETUP_INVITE_CODE) and ALLOW_PUBLIC_SIGNUP,
+        "auth": "token",
+        "oauth": {"github": False, "google": False},
+    }
+
+
+def create_token(label: str, role: str = "user"):
+    raw = secrets.token_urlsafe(24)
+    row = {
+        "id": secrets.token_hex(8),
+        "hash": hash_token(raw),
+        "label": (label or role)[:64],
+        "role": role,
+        "created": time.time(),
+    }
+    with _TOKEN_LOCK:
+        rows = load_tokens()
+        rows.append(row)
+        save_tokens(rows)
+    return raw, row
+
+
+def write_env_token(token: str):
+    """Persist bootstrap token into .env for local self-host convenience."""
+    path = os.path.join(ROOT, ".env")
+    lines = []
+    if os.path.isfile(path):
+        lines = open(path).read().splitlines()
+    out, seen = [], False
+    for line in lines:
+        if line.startswith("AGENT_MANAGER_TOKEN="):
+            out.append(f"AGENT_MANAGER_TOKEN={token}")
+            seen = True
+        else:
+            out.append(line)
+    if not seen:
+        out.append(f"AGENT_MANAGER_TOKEN={token}")
+    with open(path, "w") as f:
+        f.write("\n".join(out).rstrip() + "\n")
+
+
+def presented_token(handler) -> str:
+    tok = handler.headers.get("X-Token", "") or ""
+    if tok:
+        return tok.strip()
+    auth = handler.headers.get("Authorization", "") or ""
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return ""
+
+
+def token_ok(token: str) -> bool:
+    if not token:
+        return False
+    if ADMIN_TOKEN and secrets.compare_digest(token, ADMIN_TOKEN):
+        return True
+    digest = hash_token(token)
+    for row in load_tokens():
+        if secrets.compare_digest(row.get("hash", ""), digest):
+            return True
+    return False
 
 
 def list_agents():
@@ -145,11 +248,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _authed(self):
-        if not TOKEN:
-            return True
-        if self.headers.get("X-Token") == TOKEN:
-            return True
-        return self.headers.get("Authorization", "") == f"Bearer {TOKEN}"
+        return token_ok(presented_token(self))
 
     def _file(self, path, ctype):
         if not os.path.isfile(path):
@@ -161,8 +260,12 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _read_json(self):
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        raw = self.rfile.read(length) if length else b"{}"
+        return json.loads(raw or b"{}")
+
     def do_HEAD(self):
-        # Enough for redirects / static probes; body omitted by callers that only need headers.
         self.do_GET()
 
     def do_GET(self):
@@ -170,7 +273,6 @@ class Handler(BaseHTTPRequestHandler):
         path = u.path
         q = parse_qs(u.query)
 
-        # redirects
         if path == "/context":
             self.send_response(301)
             self.send_header("Location", "/brain/")
@@ -191,30 +293,38 @@ class Handler(BaseHTTPRequestHandler):
                 "message": "Public /space was removed. Use /mcp with a token.",
             })
 
-        # UIs
-        if path in ("/", "/index.html"):
-            return self._file(os.path.join(STATIC, "index.html"),
+        # Public UIs
+        if path in ("/", "/index.html", "/home"):
+            return self._file(os.path.join(STATIC, "home.html"),
+                              "text/html; charset=utf-8")
+        if path in ("/setup", "/setup/"):
+            return self._file(os.path.join(STATIC, "setup.html"),
                               "text/html; charset=utf-8")
         if path in ("/connect", "/connect/"):
             return self._file(os.path.join(STATIC, "connect.html"),
+                              "text/html; charset=utf-8")
+        if path in ("/agents", "/agents/"):
+            return self._file(os.path.join(STATIC, "agents.html"),
                               "text/html; charset=utf-8")
         if path in ("/brain", "/brain/"):
             return self._file(os.path.join(BRAIN_STATIC, "index.html"),
                               "text/html; charset=utf-8")
 
-        # MCP discovery
+        # Public setup + MCP discovery
+        if path == "/api/setup/status":
+            return self._json(200, setup_status())
         if path == "/mcp":
             return self._json(200, {
                 "server": "agent-manager",
-                "version": "0.3.1",
+                "version": "0.3.2",
                 "transport": "streamable-http (POST JSON-RPC to /mcp)",
                 "tools": [t["name"] for t in mcp.TOOLS],
+                "auth": "X-Token or Authorization: Bearer",
             })
 
         if not self._authed():
             return self._json(401, {"error": "unauthorized"})
 
-        # Chat API
         if path == "/api/agents":
             return self._json(200, {"agents": list_agents()})
         if path == "/api/history":
@@ -222,8 +332,6 @@ class Handler(BaseHTTPRequestHandler):
             if not valid_agent(agent):
                 return self._json(400, {"error": "bad agent"})
             return self._json(200, {"history": read_history(agent)})
-
-        # Brain API
         if path == "/api/stats":
             return self._json(200, query.stats(BRAIN.con))
         if path == "/api/search":
@@ -259,6 +367,71 @@ class Handler(BaseHTTPRequestHandler):
                 "message": "Public /space was removed. Use /mcp with a token.",
             })
 
+        # Public setup endpoints
+        if path == "/api/setup/bootstrap":
+            try:
+                payload = self._read_json()
+            except Exception:
+                return self._json(400, {"error": "bad json"})
+            if configured():
+                return self._json(409, {
+                    "error": "already_configured",
+                    "message": "This brain already has a token. "
+                               "Paste it on /setup/ or self-host your own.",
+                })
+            raw, row = create_token(payload.get("label") or "owner",
+                                    role="owner")
+            global ADMIN_TOKEN
+            if not ADMIN_TOKEN:
+                try:
+                    write_env_token(raw)
+                    ADMIN_TOKEN = raw
+                except Exception:
+                    pass
+            return self._json(201, {
+                "token": raw,
+                "id": row["id"],
+                "label": row["label"],
+                "message": "Save this token now — it will not be shown again.",
+            })
+
+        if path == "/api/setup/signup":
+            try:
+                payload = self._read_json()
+            except Exception:
+                return self._json(400, {"error": "bad json"})
+            if not configured():
+                return self._json(400, {
+                    "error": "bootstrap_required",
+                    "message": "Use /api/setup/bootstrap first.",
+                })
+            if not ALLOW_PUBLIC_SIGNUP:
+                return self._json(403, {
+                    "error": "signup_closed",
+                    "message": "Public signup is disabled. "
+                               "Self-host or ask an admin for a token.",
+                })
+            if SETUP_INVITE_CODE:
+                if (payload.get("invite") or "").strip() != SETUP_INVITE_CODE:
+                    return self._json(403, {"error": "invalid_invite"})
+            raw, row = create_token(payload.get("label") or "user", role="user")
+            return self._json(201, {
+                "token": raw,
+                "id": row["id"],
+                "label": row["label"],
+                "message": "Save this token now — it will not be shown again.",
+            })
+
+        if path == "/api/auth/verify":
+            try:
+                payload = self._read_json()
+            except Exception:
+                return self._json(400, {"error": "bad json"})
+            tok = (payload.get("token") or "").strip()
+            if token_ok(tok):
+                return self._json(200, {"ok": True})
+            return self._json(401, {"ok": False, "error": "unauthorized"})
+
         if path not in ("/api/chat", "/api/ask", "/api/refresh",
                         "/api/note", "/mcp"):
             return self._json(404, {"error": "not found"})
@@ -266,8 +439,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(401, {"error": "unauthorized"})
 
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            payload = json.loads(self.rfile.read(length) or b"{}")
+            payload = self._read_json()
         except Exception:
             return self._json(400, {"error": "bad json"})
 
@@ -317,8 +489,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    # Ensure DB exists / schema ready
     store.connect(BRAIN_CFG["db_path"]).close()
     port = int(os.environ.get("AGENT_MANAGER_PORT", "8075"))
-    print(f"agent-manager on :{port} (chat + brain + mcp)", flush=True)
+    print(f"agent-manager on :{port} (public setup + brain + mcp)", flush=True)
+    print(f"  bootstrap={not configured()} signup_open={ALLOW_PUBLIC_SIGNUP}",
+          flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

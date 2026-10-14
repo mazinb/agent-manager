@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup — Agent Manager</title>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--fg:#e6edf3;--dim:#8b949e;--acc:#58a6ff;--ok:#3fb950;--warn:#d29922}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 ui-sans-serif,system-ui,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
+header h1{font-size:17px;margin:0}header nav{margin-left:auto;display:flex;gap:14px;font-size:13px}
+a{color:var(--acc);text-decoration:none}
+main{max-width:720px;margin:0 auto;padding:28px 16px 80px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;margin:0 0 14px}
+h2{margin:0 0 8px;font-size:20px}p{color:var(--dim);margin:0 0 12px}
+label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px}
+input{width:100%;background:#0d1117;border:1px solid var(--border);color:var(--fg);border-radius:8px;padding:10px 12px;font:inherit}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{background:var(--acc);color:#04121f;border:0;border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer}
+button.ghost{background:#21262d;color:var(--fg);border:1px solid var(--border)}
+button:disabled{opacity:.5;cursor:default}
+.token{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0d1117;border:1px solid var(--ok);
+  border-radius:10px;padding:12px;word-break:break-all;color:var(--fg)}
+.warn{color:var(--warn);font-size:13px}
+.ok{color:var(--ok);font-size:13px}
+.hidden{display:none}
+ol{color:var(--dim);padding-left:18px}ol li{margin:4px 0}
+code{font:12.5px ui-monospace,Menlo,monospace;color:var(--fg)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Setup</h1>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/connect/">Connect</a>
+    <a href="/brain/">Brain</a>
+  </nav>
+</header>
+<main>
+  <div class="card" id="loading"><p>Checking this brain…</p></div>
+
+  <div class="card hidden" id="panel-bootstrap">
+    <h2>Create your access token</h2>
+    <p>First-time setup. We’ll generate a token once — copy it somewhere safe. You’ll use it for the UI and for every MCP client.</p>
+    <label for="label">Label (optional)</label>
+    <input id="label" placeholder="laptop, team, …">
+    <div class="row">
+      <button type="button" id="btn-bootstrap" onclick="bootstrap()">Create token</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="panel-signup">
+    <h2>Request an access token</h2>
+    <p>Signup is open on this brain. Create a personal token, save it, then connect your agents.</p>
+    <label for="label2">Label (optional)</label>
+    <input id="label2" placeholder="my-laptop">
+    <label for="invite">Invite code (if required)</label>
+    <input id="invite" placeholder="leave blank if none">
+    <div class="row">
+      <button type="button" onclick="signup()">Create token</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="panel-locked">
+    <h2>This brain is private</h2>
+    <p>A token already protects this instance. Paste one you were given, or self-host to create your own brain.</p>
+    <label for="existing">Access token</label>
+    <input id="existing" type="password" placeholder="Paste token">
+    <div class="row">
+      <button type="button" onclick="saveExisting()">Save & continue</button>
+      <a class="ghost" href="/connect/" style="display:inline-flex;align-items:center;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:#21262d;color:var(--fg)">Connect docs</a>
+    </div>
+    <p style="margin-top:14px">Self-host in one minute:</p>
+    <ol>
+      <li><code>npx agent-manager-brain init</code></li>
+      <li><code>npx agent-manager-brain serve</code></li>
+      <li>Open <code>http://127.0.0.1:8075/setup/</code> and create your token</li>
+    </ol>
+  </div>
+
+  <div class="card hidden" id="panel-done">
+    <h2>Save this token now</h2>
+    <p class="warn">It won’t be shown again. Store it in a password manager, then use it as <code>X-Token</code> for MCP.</p>
+    <div class="token" id="token-value"></div>
+    <div class="row">
+      <button type="button" onclick="copyToken()">Copy token</button>
+      <button type="button" class="ghost" onclick="goConnect()">Connect an agent</button>
+      <button type="button" class="ghost" onclick="goBrain()">Open brain</button>
+    </div>
+    <p class="ok" id="copied"></p>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let CREATED = '';
+
+async function boot(){
+  const s = await fetch('/api/setup/status').then(r=>r.json());
+  $('loading').classList.add('hidden');
+  if(s.bootstrap) $('panel-bootstrap').classList.remove('hidden');
+  else if(s.signup_open) $('panel-signup').classList.remove('hidden');
+  else $('panel-locked').classList.remove('hidden');
+  const t = localStorage.getItem('am_token');
+  if(t) $('existing').value = t;
+}
+
+async function bootstrap(){
+  $('btn-bootstrap').disabled = true;
+  const r = await fetch('/api/setup/bootstrap', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({label: $('label').value.trim() || 'owner'}),
+  });
+  const d = await r.json();
+  if(!r.ok){ alert(d.error || 'failed'); $('btn-bootstrap').disabled=false; return; }
+  showToken(d.token);
+}
+
+async function signup(){
+  const r = await fetch('/api/setup/signup', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      label: $('label2').value.trim() || 'user',
+      invite: $('invite').value.trim(),
+    }),
+  });
+  const d = await r.json();
+  if(!r.ok){ alert(d.error || 'failed'); return; }
+  showToken(d.token);
+}
+
+function showToken(token){
+  CREATED = token;
+  localStorage.setItem('am_token', token);
+  ['panel-bootstrap','panel-signup','panel-locked'].forEach(id => $(id).classList.add('hidden'));
+  $('panel-done').classList.remove('hidden');
+  $('token-value').textContent = token;
+}
+
+function saveExisting(){
+  const t = $('existing').value.trim();
+  if(!t) return;
+  localStorage.setItem('am_token', t);
+  location.href = '/brain/';
+}
+
+async function copyToken(){
+  await navigator.clipboard.writeText(CREATED);
+  $('copied').textContent = 'Copied.';
+}
+function goConnect(){ location.href = '/connect/'; }
+function goBrain(){ location.href = '/brain/'; }
+boot();
+</script>
+</body>
+</html>

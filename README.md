@@ -8,51 +8,55 @@ and **save notes** so the next session starts with memory.
 
 Self-hosted. Stdlib-only Python. One process.
 
-**Live demo / host UI:** [bot.getzoro.com](https://bot.getzoro.com)
+**Live:** [bot.getzoro.com](https://bot.getzoro.com)
 
 | Path | Purpose |
 |---|---|
+| [`/`](https://bot.getzoro.com/) | Public landing |
+| [`/setup/`](https://bot.getzoro.com/setup/) | Create or save an access token |
 | [`/connect/`](https://bot.getzoro.com/connect/) | One-click copy setup for every major agent |
-| `/` | Optional helper chat UI |
 | `/brain/` | Ask / entities / context packs |
+| `/agents/` | Optional helper chat UI |
 | `/mcp` | Streamable HTTP MCP |
 | `/api/*` | JSON API |
 
-## Connect in 30 seconds
+## First-time setup
 
-npm package: **[`agent-manager-brain`](https://www.npmjs.com/package/agent-manager-brain)**
+1. Open **[/setup/](https://bot.getzoro.com/setup/)**  
+2. On a fresh brain: **Create token** (shown once — save it)  
+3. On a private hosted brain: paste a token you were given, or self-host  
+4. Open **[/connect/](https://bot.getzoro.com/connect/)**, pick your agent, **Copy**
 
-Open **[/connect/](https://bot.getzoro.com/connect/)**, paste your access token,
-pick your agent, hit **Copy**.
+Auth is the token itself (no password page). Same value goes in the browser and
+as `X-Token` / `Bearer` for MCP. Details: [docs/AUTH.md](docs/AUTH.md).
 
-Or run a one-liner:
+## Connect agents (npm)
+
+Package: **[`agent-manager-brain`](https://www.npmjs.com/package/agent-manager-brain)**
 
 ```bash
-# Cursor
-npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent cursor
-
-# Claude Code
-npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent claude
-
-# VS Code / Copilot, Windsurf, Cline, Continue, Zed, …
-npx --yes agent-manager-brain connect --url https://bot.getzoro.com --token YOUR_TOKEN --agent vscode
+npx --yes agent-manager-brain connect \
+  --url https://bot.getzoro.com \
+  --token YOUR_TOKEN \
+  --agent vscode
 ```
 
-Supported `--agent` values: `cursor`, `claude`, `vscode`, `copilot`, `windsurf`,
-`cline`, `continue`, `zed`, `codex`, `gemini`, `generic`.
+`--agent`: `claude` · `vscode` · `copilot` · `cursor` · `windsurf` · `cline` ·
+`continue` · `zed` · `codex` · `gemini` · `generic`
 
 ### Self-host via npm
 
 ```bash
-npx --yes agent-manager-brain init     # clone + .env + config
-npx --yes agent-manager-brain serve    # http://127.0.0.1:8075  (needs python3)
+npx --yes agent-manager-brain init
+npx --yes agent-manager-brain serve
+# open http://127.0.0.1:8075/setup/  → create token
 npx --yes agent-manager-brain connect \
   --url http://127.0.0.1:8075 \
-  --token "$(grep AGENT_MANAGER_TOKEN ~/.agent-manager/app/.env | cut -d= -f2)" \
-  --agent cursor
+  --token YOUR_TOKEN \
+  --agent generic
 ```
 
-Full step-by-step for each platform: **[docs/CONNECT.md](docs/CONNECT.md)**.
+Full platform steps: **[docs/CONNECT.md](docs/CONNECT.md)**.
 
 ### Generic MCP JSON
 
@@ -67,51 +71,35 @@ Full step-by-step for each platform: **[docs/CONNECT.md](docs/CONNECT.md)**.
 }
 ```
 
-Auth: `X-Token` or `Authorization: Bearer`.  
 Tools: `ask`, `search`, `entity`, `context_pack`, `projects`, `stats`, `note`.
 
-## Self-host
+## Self-host (Python)
 
 ```bash
-cp .env.example .env                 # set AGENT_MANAGER_TOKEN
+cp .env.example .env                 # or create token via /setup/
 mkdir -p ~/.config/agent-manager
 cp config.example.json ~/.config/agent-manager/config.json
-# edit sources / llm as needed
 
 pip install -e .
-agent-manager refresh                # ingest
+agent-manager refresh
 agent-manager serve                  # http://127.0.0.1:8075
 ```
 
-Then open `http://127.0.0.1:8075/connect/` and point agents at
-`http://127.0.0.1:8075/mcp`.
-
-Optional: `bash install.sh` installs local helper chat profiles from `staging/`
-if you use that workflow.
-
-## How the brain works
-
-```
-ingest ──▶ resolve ──▶ query
-files     entities    search / ask
-memories  graph       context packs
-services              notes (agent → agent)
-```
-
-- **SQLite + FTS5** — one file, WAL
-- **Local LLM optional** — any OpenAI-compatible endpoint for cited answers
-- **MCP + REST** — same auth, same tools
+Optional open signup for extra tokens: `ALLOW_PUBLIC_SIGNUP=1`  
+Optional invite gate: `SETUP_INVITE_CODE=…`
 
 ## Layout
 
 ```
+static/home.html             public landing
+static/setup.html            token onboarding
 static/connect.html          one-click setup UI
-static/index.html            helper chat UI
-agent_context/               brain library (ingest / query / MCP)
+static/agents.html           helper chat UI
+agent_context/               brain library
 server.py                    unified HTTP process
 docs/CONNECT.md              per-platform instructions
+docs/AUTH.md                 token model + OAuth notes
 npm/                         npx agent-manager-brain CLI
-config.example.json          brain sources / llm
 ```
 
 ## License

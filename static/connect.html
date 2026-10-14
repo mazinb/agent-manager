@@ -39,7 +39,8 @@ pre { margin:0; background:#0d1117; border:1px solid var(--border); border-radiu
 <body>
 <header>
   <h1>Connect any agent</h1>
-  <a href="/">Agents</a>
+  <a href="/">Home</a>
+  <a href="/setup/">Setup</a>
   <a href="/brain/">Brain</a>
   <span class="spacer"></span>
   <span class="hint" id="status">Paste your token to personalize the snippets.</span>
@@ -47,11 +48,16 @@ pre { margin:0; background:#0d1117; border:1px solid var(--border); border-radiu
 <main>
   <p class="lead">
     Agent Manager is a shared brain over MCP. Point any coding agent at it —
-    Cursor, Claude Code, VS Code, Windsurf, Cline, Continue, Zed, Codex, or a raw HTTP client.
-    npm package: <code style="color:var(--fg)">agent-manager-brain</code>
+    Claude Code, VS Code, Cursor, Windsurf, Cline, Continue, Zed, Codex, Gemini, or plain HTTP.
+    npm: <code style="color:var(--fg)">agent-manager-brain</code>
     (<a href="https://www.npmjs.com/package/agent-manager-brain">npm</a> ·
     <a href="https://github.com/mazinb/agent-manager/tree/main/npm">source</a>).
+    Need a token first? <a href="/setup/">Get started</a>.
   </p>
+  <div class="card" id="token-cta" style="margin-bottom:14px">
+    <h2 style="margin:0 0 6px;font-size:15px">Access token</h2>
+    <p class="hint" style="margin:0" id="token-cta-text">Checking setup…</p>
+  </div>
 
   <div class="row">
     <div class="field">
@@ -83,6 +89,19 @@ const DEFAULT_BASE = location.origin.includes('localhost') || location.origin.in
 
 $('base').value = localStorage.getItem('am_base') || DEFAULT_BASE;
 $('token').value = localStorage.getItem('am_token') || '';
+
+fetch('/api/setup/status').then(r => r.json()).then(s => {
+  const el = $('token-cta-text');
+  if (s.bootstrap) {
+    el.innerHTML = 'This brain has no token yet. <a href="/setup/">Create one</a> (shown once — save it), then come back here.';
+  } else if (s.signup_open) {
+    el.innerHTML = 'Signup is open. <a href="/setup/">Request a token</a>, paste it above, then copy a platform snippet.';
+  } else if (!token()) {
+    el.innerHTML = 'This brain is private. Paste a token you already have, or <a href="/setup/">self-host</a> to create your own.';
+  } else {
+    el.textContent = 'Token loaded from this browser. Snippets below include it — treat them as secrets.';
+  }
+}).catch(() => { $('token-cta-text').textContent = 'Paste a token above to personalize snippets.'; });
 
 function base() {
   return ($('base').value || DEFAULT_BASE).replace(/\/+$/, '').replace(/\/mcp$/, '');
