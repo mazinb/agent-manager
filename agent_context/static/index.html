@@ -149,7 +149,8 @@ code{font-family:var(--mono);font-size:.92em;background:#21262d;border-radius:4p
 
   <section id="tab-packs" style="display:none">
     <div class="row">
-      <select id="project"></select>
+      <select id="project" onchange="updateVisBtn()"></select>
+      <button class="ghost" id="visbtn" onclick="toggleVis()"></button>
       <button class="ghost" onclick="loadPack()">Load</button>
       <button class="ghost" onclick="copyPack()">Copy</button>
     </div>
@@ -249,6 +250,8 @@ async function boot() {
   $('#stats').textContent = `${s.entities} entities · ${s.chunks} chunks`;
   const ps = await api('/api/projects');
   $('#project').innerHTML = (ps.projects || []).map(p => `<option>${esc(p)}</option>`).join('');
+  VIS = ps.visibility || {};
+  updateVisBtn();
   const es = await api('/api/entities');
   ENTITIES = es.entities || [];
   renderTypeFilters();
@@ -370,6 +373,23 @@ async function ask() {
   }).join('');
 }
 
+let VIS = {};
+function updateVisBtn() {
+  const p = $('#project').value;
+  const b = $('#visbtn');
+  if (!b) return;
+  const v = VIS[p] || 'private';
+  b.textContent = v === 'public' ? '🌐 public' : '🔒 private';
+  b.title = 'Public: other projects can see this project\'s content in their searches. Private (default): only this project\'s agents.';
+}
+async function toggleVis() {
+  const p = $('#project').value;
+  if (!p) return;
+  const next = (VIS[p] || 'private') === 'public' ? 'private' : 'public';
+  await api('/api/project/visibility', {method: 'POST', body: JSON.stringify({project: p, visibility: next})});
+  VIS[p] = next;
+  updateVisBtn();
+}
 async function loadPack() {
   const p = $('#project').value;
   const d = await api('/api/context?project=' + encodeURIComponent(p));

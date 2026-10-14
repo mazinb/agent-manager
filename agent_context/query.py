@@ -36,7 +36,9 @@ def search(con, q, limit=12, include_stale=False, project=None):
         " AND NOT (s.kind='note' AND COALESCE(s.stale, 0))"
     project_guard = ""
     if project:
-        project_guard = " AND s.project=?"
+        project_guard = (" AND (s.project=? OR s.project IN ("
+                         "SELECT project FROM project_visibility "
+                         "WHERE visibility='public'))")
     results = {}
     if expr:
         rows = con.execute(
@@ -93,16 +95,23 @@ def entity_card(con, name):
 
 
 def context_pack(con, project, max_chars=6000):
-    """Compact injectable pack for an agent prompt."""
+    """Compact injectable pack for an agent prompt.
+
+    Own project first, then public projects ride along (private ones never do).
+    """
     parts = []
     rows = con.execute(
-        "SELECT s.kind, c.heading, c.text FROM chunks c "
-        "JOIN sources s ON c.source_id=s.id WHERE s.project=? "
+        "SELECT s.kind, c.heading, c.text, s.project FROM chunks c "
+        "JOIN sources s ON c.source_id=s.id "
+        "WHERE (s.project=? OR s.project IN ("
+        "SELECT project FROM project_visibility WHERE visibility='public')) "
         "AND NOT (s.kind='note' AND COALESCE(s.stale, 0)) "
-        "ORDER BY CASE s.kind WHEN 'project_readme' THEN 0 "
+        "ORDER BY (s.project=?) DESC, "
+        "CASE s.kind WHEN 'project_readme' THEN 0 "
         "WHEN 'rule' THEN 1 WHEN 'soul' THEN 2 WHEN 'skill' THEN 3 "
         "WHEN 'memory' THEN 4 WHEN 'services' THEN 5 WHEN 'git' THEN 6 "
-        "ELSE 7 END, s.path, c.ord", (project,)).fetchall()
+        "ELSE 7 END, s.path, c.ord",
+        (project, project)).fetchall()
     budget = max_chars
     for r in rows:
         text = _body_without_heading(r["text"] or "", r["heading"] or "")

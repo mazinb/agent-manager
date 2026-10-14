@@ -283,7 +283,10 @@ class Handler(BaseHTTPRequestHandler):
             ).fetchall()
             return self._json(200, {"entities": [dict(r) for r in rows]})
         if path == "/api/projects":
-            return self._json(200, {"projects": query.projects(BRAIN.con)})
+            vis = {r["project"]: r["visibility"] for r in BRAIN.con.execute(
+                "SELECT project, visibility FROM project_visibility")}
+            return self._json(200, {"projects": query.projects(BRAIN.con),
+                                    "visibility": vis})
         if path == "/api/context":
             project = (q.get("project") or [""])[0]
             if project not in query.projects(BRAIN.con):
@@ -388,6 +391,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, mcp.TOOL_FUNCS["note"](BRAIN, payload))
             except ValueError as e:
                 return self._json(400, {"error": str(e)})
+
+        if path == "/api/project/visibility":
+            project = (payload.get("project") or "").strip()
+            visibility = (payload.get("visibility") or "").strip()
+            if project not in query.projects(BRAIN.con):
+                return self._json(404, {"error": "unknown project"})
+            try:
+                store.set_project_visibility(BRAIN.con, project, visibility)
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+            return self._json(200, {"project": project,
+                                    "visibility": visibility})
 
         if path == "/api/refresh":
             return self._json(200, BRAIN.refresh())

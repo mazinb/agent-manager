@@ -244,5 +244,60 @@ class Chunk4ProvenanceInResults(unittest.TestCase):
         self.assertIn("confidence", c)
 
 
+class Chunk5ProjectVisibility(unittest.TestCase):
+    def _seed_three(self):
+        con = fresh_con()
+        store.upsert_source(con, "a.md", "project_readme", "alpha", 1, 10,
+                            [("A", "alpha secret keyword zebra")])
+        store.upsert_source(con, "b.md", "project_readme", "beta", 1, 10,
+                            [("B", "beta shared keyword zebra")])
+        store.upsert_source(con, "g.md", "project_readme", "gamma", 1, 10,
+                            [("G", "gamma hidden keyword zebra")])
+        con.commit()
+        return con
+
+    def test_default_private_no_leak(self):
+        from agent_context import query
+        con = self._seed_three()
+        hits = query.search(con, "zebra", project="alpha")
+        self.assertEqual({r["project"] for r in hits}, {"alpha"})
+
+    def test_public_project_rides_along(self):
+        from agent_context import query
+        con = self._seed_three()
+        store.set_project_visibility(con, "beta", "public")
+        hits = query.search(con, "zebra", project="alpha")
+        self.assertEqual({r["project"] for r in hits}, {"alpha", "beta"})
+
+    def test_private_stays_hidden_after_other_toggle(self):
+        from agent_context import query
+        con = self._seed_three()
+        store.set_project_visibility(con, "beta", "public")
+        hits = query.search(con, "zebra", project="alpha")
+        self.assertNotIn("gamma", {r["project"] for r in hits})
+
+    def test_toggle_back_to_private(self):
+        from agent_context import query
+        con = self._seed_three()
+        store.set_project_visibility(con, "beta", "public")
+        store.set_project_visibility(con, "beta", "private")
+        hits = query.search(con, "zebra", project="alpha")
+        self.assertEqual({r["project"] for r in hits}, {"alpha"})
+
+    def test_invalid_visibility_rejected(self):
+        con = self._seed_three()
+        with self.assertRaises(ValueError):
+            store.set_project_visibility(con, "beta", "internal")
+
+    def test_pack_includes_public_not_private(self):
+        from agent_context import query
+        con = self._seed_three()
+        store.set_project_visibility(con, "beta", "public")
+        pack = query.context_pack(con, "alpha")
+        self.assertIn("beta shared keyword", pack)
+        self.assertNotIn("gamma hidden", pack)
+        self.assertIn("alpha secret", pack)
+
+
 if __name__ == "__main__":
     unittest.main()

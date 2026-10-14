@@ -60,7 +60,29 @@ def _ensure_trust_columns(con):
     for name, decl in TRUST_COLUMNS:
         if name not in have:
             con.execute(f"ALTER TABLE sources ADD COLUMN {name} {decl}")
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS project_visibility ("
+        "project TEXT PRIMARY KEY, visibility TEXT NOT NULL DEFAULT 'private')")
     con.commit()
+
+
+def set_project_visibility(con, project, visibility):
+    """Toggle a project public/private. Private (default): other projects'
+    agents never see its content. Public: its chunks ride along in other
+    projects' searches and packs."""
+    if visibility not in ("public", "private"):
+        raise ValueError("visibility must be 'public' or 'private'")
+    con.execute(
+        "INSERT INTO project_visibility(project, visibility) VALUES(?,?) "
+        "ON CONFLICT(project) DO UPDATE SET visibility=excluded.visibility",
+        (project, visibility))
+    con.commit()
+
+
+def public_projects(con):
+    return [r["project"] for r in con.execute(
+        "SELECT project FROM project_visibility WHERE visibility='public' "
+        "ORDER BY project")]
 
 
 def connect(db_path):
