@@ -44,9 +44,6 @@ CONFIG_PATH = os.environ.get(
     os.path.expanduser("~/.config/agent-manager/config.json"),
 )
 LEGACY_CONFIG = os.path.expanduser("~/.config/agent-context/config.json")
-ALLOW_PUBLIC_SIGNUP = os.environ.get("ALLOW_PUBLIC_SIGNUP", "").lower() in (
-    "1", "true", "yes", "on")
-SETUP_INVITE_CODE = os.environ.get("SETUP_INVITE_CODE", "").strip()
 _TOKEN_LOCK = threading.Lock()
 
 META_RE = re.compile(
@@ -84,6 +81,17 @@ def load_brain_config():
 ENV = load_env()
 ADMIN_TOKEN = ENV.get("AGENT_MANAGER_TOKEN", "") or os.environ.get(
     "AGENT_MANAGER_TOKEN", "")
+
+
+def _flag(name: str, default: str = "") -> bool:
+    raw = (ENV.get(name) or os.environ.get(name) or default).strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
+ALLOW_PUBLIC_SIGNUP = _flag("ALLOW_PUBLIC_SIGNUP")
+SETUP_INVITE_CODE = (
+    ENV.get("SETUP_INVITE_CODE") or os.environ.get("SETUP_INVITE_CODE") or ""
+).strip()
 BRAIN_CFG = load_brain_config()
 BRAIN = Brain(BRAIN_CFG)
 
