@@ -37,7 +37,7 @@ a{color:var(--acc);text-decoration:none}
   border-bottom:1px solid var(--border)}
 .tabs button{appearance:none;background:transparent;color:var(--dim);border:0;
   border-bottom:2px solid transparent;margin-bottom:-1px;padding:0 14px;
-  font:13px/1 -apple-system,"Segoe UI",Roboto,sans-serif;font-weight:550;
+  font:13px/1 ui-sans-serif,system-ui,sans-serif;font-weight:550;
   cursor:pointer;height:100%;transition:color .08s linear,border-color .08s linear}
 .tabs button:hover{color:var(--fg)}
 .tabs button.on{color:var(--fg);border-bottom-color:var(--acc)}
@@ -234,7 +234,7 @@ async function api(path, opts={}) {
     },
   });
   if (r.status === 401) {
-    TOKEN = prompt('Token required:') || '';
+    TOKEN = prompt('Token:') || '';
     localStorage.setItem(TOKEN_KEY, TOKEN);
     return api(path, opts);
   }
