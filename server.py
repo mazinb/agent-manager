@@ -207,6 +207,23 @@ class Handler(BaseHTTPRequestHandler):
     def _authed(self):
         return token_ok(presented_token(self))
 
+    def _unauth(self):
+        """Clearer 401 — name what's missing so agents aren't silent failures."""
+        tok = presented_token(self)
+        if not tok:
+            return self._json(401, {
+                "error": "unauthorized",
+                "hint": "Missing key. Pass X-Token or Authorization: Bearer "
+                        "with an agent key (mint at /agents/ or POST "
+                        "/api/roster/join) or the admin token. See /join/.",
+            })
+        return self._json(401, {
+            "error": "unauthorized",
+            "hint": "Invalid key — not a known agent key or admin token. "
+                    "Mint a fresh key at /agents/ (Team ··· → Mint key) "
+                    "or POST /api/roster/join. See /join/.",
+        })
+
     def _file(self, path, ctype, cache=None):
         """Serve a static file. `cache` is a Cache-Control value; public
         marketing/connect pages should be edge-cacheable so Cloudflare does
@@ -288,6 +305,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._file(os.path.join(STATIC, "setup.html"),
                               "text/html; charset=utf-8",
                               cache="public, max-age=60, s-maxage=300")
+        if path in ("/join", "/join/"):
+            return self._file(os.path.join(STATIC, "join.html"),
+                              "text/html; charset=utf-8",
+                              cache="public, max-age=60")
         if path in ("/agents", "/agents/", "/connect", "/connect/"):
             return self._file(os.path.join(STATIC, "agents.html"),
                               "text/html; charset=utf-8",
@@ -335,8 +356,17 @@ class Handler(BaseHTTPRequestHandler):
                 f"localStorage.setItem('am_token', {json.dumps(raw)});"
                 "location.href = '/brain/';")
 
+        if path == "/api/whoami":
+            # Identity check — works with agent keys; clear hint on failure.
+            try:
+                return self._json(200, roster.whoami(
+                    BRAIN.con, presented_token(self), ADMIN_TOKEN or ""))
+            except ValueError as e:
+                return self._json(401, {"error": "unauthorized",
+                                        "hint": str(e)})
+
         if not self._authed():
-            return self._json(401, {"error": "unauthorized"})
+            return self._unauth()
 
         if path == "/api/inbox":
             project = (q.get("project") or [None])[0] or None
@@ -563,10 +593,11 @@ class Handler(BaseHTTPRequestHandler):
             "/api/roster/tasks/update", "/api/roster/rules",
             "/api/roster/briefs", "/api/roster/policies",
             "/api/roster/ready", "/api/roster/poll",
+            "/api/roster/join",
         ):
             return self._json(404, {"error": "not found"})
         if not self._authed():
-            return self._json(401, {"error": "unauthorized"})
+            return self._unauth()
 
         try:
             payload = self._read_json()
@@ -688,6 +719,17 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self._json(200, checks.agent_poll(
                     BRAIN.con, payload.get("agent") or ""))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/join":
+            try:
+                return self._json(201, roster.join_agent(
+                    BRAIN.con,
+                    payload.get("agent") or payload.get("name") or "",
+                    chat=payload.get("chat"),
+                    role=payload.get("role") or "worker",
+                    mint=False if payload.get("mint") is False else True,
+                    label=payload.get("label")))
             except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
 

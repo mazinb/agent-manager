@@ -41,6 +41,18 @@ class AgentPolicies(unittest.TestCase):
         self.assertEqual(again["policy"], out["policy"])
 
 
+def _swap_gate(name, fn):
+    """Replace a gate fn for the duration of a with-block (patch.dict can flake)."""
+    class _Ctx:
+        def __enter__(self):
+            self._orig = checks.GATE_FUNCS[name]
+            checks.GATE_FUNCS[name] = fn
+            return self
+        def __exit__(self, *a):
+            checks.GATE_FUNCS[name] = self._orig
+    return _Ctx()
+
+
 class AgentReady(unittest.TestCase):
     def test_ready_blocks_when_gate_fails(self):
         con = fresh()
@@ -49,8 +61,7 @@ class AgentReady(unittest.TestCase):
             "poll": {"every_min": 5, "actions": []},
             "on_fail": "block",
         })
-        with mock.patch.object(checks, "_gate_brain",
-                               return_value={"ok": False, "detail": "down"}):
+        with _swap_gate("brain", lambda: {"ok": False, "detail": "down"}):
             out = checks.agent_ready(con, "hermes")
         self.assertFalse(out["ready"])
         self.assertTrue(out["blocked"])
@@ -65,8 +76,7 @@ class AgentReady(unittest.TestCase):
             "poll": {"every_min": 0, "actions": []},
             "on_fail": "warn",
         })
-        with mock.patch.object(checks, "_gate_brain",
-                               return_value={"ok": False, "detail": "down"}):
+        with _swap_gate("brain", lambda: {"ok": False, "detail": "down"}):
             out = checks.agent_ready(con, "cursor")
         self.assertTrue(out["ready"])
         self.assertFalse(out["blocked"])
@@ -82,9 +92,7 @@ class AgentReady(unittest.TestCase):
         mcp._message_peer(_Brain(con), {
             "agent": "cursor", "to_agent": "hermes",
             "title": "hi", "body": "role: handoff\ntask: x\ndo: y"})
-        with mock.patch.object(checks, "_gate_brain",
-                               return_value={"ok": True, "detail": "ok"}):
-            out = checks.agent_poll(con, "hermes")
+        out = checks.agent_poll(con, "hermes")
         self.assertEqual(out["actions"]["peer_inbox"]["count"], 1)
         self.assertIn("hi", out["actions"]["peer_inbox"]["titles"])
 
@@ -96,8 +104,7 @@ class McpChecks(unittest.TestCase):
             "gates": ["thermal"], "poll": {"every_min": 0, "actions": []},
             "on_fail": "block",
         })
-        with mock.patch.object(checks, "_gate_thermal",
-                               return_value={"ok": True, "detail": "cool"}):
+        with _swap_gate("thermal", lambda: {"ok": True, "detail": "cool"}):
             out = mcp._agent_ready(_Brain(con), {"agent": "hermes"})
         self.assertTrue(out["ready"])
 

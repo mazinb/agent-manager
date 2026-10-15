@@ -66,8 +66,13 @@ def _ensure(con):
         "token_hash TEXT NOT NULL DEFAULT '',"
         "token_hint TEXT NOT NULL DEFAULT '',"
         "parallel_ok INTEGER NOT NULL DEFAULT 1,"
-        "created_at REAL NOT NULL DEFAULT 0)"
+        "created_at REAL NOT NULL DEFAULT 0,"
+        "last_seen_at REAL NOT NULL DEFAULT 0)"
     )
+    if "last_seen_at" not in _cols(con, "agents"):
+        con.execute(
+            "ALTER TABLE agents ADD COLUMN last_seen_at "
+            "REAL NOT NULL DEFAULT 0")
     con.execute(
         "CREATE TABLE IF NOT EXISTS boards ("
         "id INTEGER PRIMARY KEY,"
@@ -341,7 +346,7 @@ def _resolve_board_id(con, board_id=None, chat=None):
 def list_agents(con):
     _ensure(con)
     rows = con.execute(
-        "SELECT name, label, token_hint, parallel_ok, created_at,"
+        "SELECT name, label, token_hint, parallel_ok, created_at, last_seen_at,"
         " CASE WHEN token_hash != '' THEN 1 ELSE 0 END AS has_key "
         "FROM agents ORDER BY name").fetchall()
     return [{
@@ -349,7 +354,87 @@ def list_agents(con):
         "has_key": bool(r["has_key"]), "token_hint": r["token_hint"] or "",
         "parallel_ok": bool(r["parallel_ok"]),
         "created_at": r["created_at"],
+        "last_seen_at": r["last_seen_at"] or 0,
     } for r in rows]
+
+
+def touch_last_seen(con, agent: str):
+    """Bump last_seen_at (call on whoami / note / peer message)."""
+    _ensure(con)
+    agent = _slug(agent)
+    if not con.execute("SELECT 1 FROM agents WHERE name=?", (agent,)).fetchone():
+        return
+    con.execute(
+        "UPDATE agents SET last_seen_at=? WHERE name=?", (time.time(), agent))
+    con.commit()
+
+
+def whoami(con, token: str, admin_token: str = "") -> dict:
+    """Resolve a presented token to an identity + boards.
+
+    Agent keys → {agent, key_ok, boards, …}. Admin token → {admin: true}.
+    Raises ValueError if the token is missing/invalid.
+    """
+    _ensure(con)
+    if not token:
+        raise ValueError(
+            "missing key — pass X-Token or Authorization: Bearer "
+            "with an agent key (mint at /agents/) or admin token")
+    if admin_token and secrets.compare_digest(token, admin_token):
+        return {
+            "admin": True, "key_ok": True, "agent": None,
+            "boards": [b["chat"] for b in list_boards(con)],
+            "message": "admin token",
+        }
+    name = agent_token_ok(con, token)
+    if not name:
+        raise ValueError(
+            "invalid key — not an agent key or admin token. "
+            "Mint a key at /agents/ (Team ··· → Mint key) or see /join/")
+    touch_last_seen(con, name)
+    boards = []
+    for b in list_boards(con):
+        if is_member(con, b["id"], name):
+            role = next(
+                (m["role"] for m in b["members"] if m["agent"] == name),
+                "member")
+            boards.append({"chat": b["chat"], "role": role})
+    agent = next(a for a in list_agents(con) if a["name"] == name)
+    return {
+        "admin": False,
+        "key_ok": True,
+        "agent": name,
+        "label": agent["label"],
+        "boards": boards,
+        "has_key": True,
+        "last_seen_at": agent["last_seen_at"],
+        "parallel_ok": agent["parallel_ok"],
+    }
+
+
+def join_agent(con, name, chat=None, role="worker", mint=True, label=None):
+    """One-shot: ensure roster row, board membership, optional key mint.
+
+    Removes the 'roster hassle' — agents (or Mazin) call this instead of
+    add-agent then mint separately.
+    """
+    _ensure(con)
+    chat = chat or DEFAULT_CHAT
+    agent = upsert_agent(con, name, label=label)
+    board = add_member(con, chat=chat, agent=agent["name"], role=role)
+    out = {
+        "agent": agent["name"],
+        "label": agent["label"],
+        "chat": board["chat"],
+        "role": role,
+        "board_id": board["id"],
+    }
+    if mint:
+        key = mint_agent_key(con, agent["name"])
+        out["token"] = key["token"]
+        out["hint"] = key["hint"]
+        out["message"] = key["message"]
+    return out
 
 
 def upsert_agent(con, name, label=None, parallel_ok=None):

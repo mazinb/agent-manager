@@ -167,13 +167,15 @@ tr:last-child td{border-bottom:0}
     <section class="sec">
       <h2>Team</h2>
       <table>
-        <thead><tr><th>Agent</th><th>Role</th><th>Mode</th><th>Ready</th><th>Key</th><th></th></tr></thead>
+        <thead><tr><th>Agent</th><th>Role</th><th>Ready</th><th>Seen</th><th>Key</th><th></th></tr></thead>
         <tbody id="team-rows"></tbody>
       </table>
       <div class="row" style="margin-top:12px">
-        <div class="field"><label>Add agent</label><input id="new-agent" placeholder="e.g. travel-helper"></div>
-        <button type="button" class="btn primary" id="btn-add-agent">Add</button>
+        <div class="field"><label>Join agent</label><input id="new-agent" placeholder="e.g. travel-helper"></div>
+        <button type="button" class="btn primary" id="btn-join-agent">Join + key</button>
+        <button type="button" class="btn ghost" id="btn-add-agent">Add only</button>
       </div>
+      <p class="hint">Join adds to this board and mints a view-once key. <a href="/join/">Join guide</a></p>
       <div id="key-once" class="reveal hidden">
         <p class="warn" style="margin:0 0 6px;font-size:12px">Key for <span id="key-agent"></span> — once.</p>
         <div class="tok" id="key-tok"></div>
@@ -210,7 +212,7 @@ tr:last-child td{border-bottom:0}
         <tbody id="brief-rows"></tbody>
       </table>
       <div id="brief-edit" class="brief-edit hidden"></div>
-      <p class="hint">Markdown per member. Loaded at chat start.</p>
+      <p class="hint" id="brief-hint">Markdown per member. Loaded at chat start.</p>
     </section>
   </div>
 </main>
@@ -312,11 +314,10 @@ function renderTeam(){
   }
   const byName = new Map(AGENTS.map(a => [a.name, a]));
   $('team-rows').innerHTML = [...names].sort().map(n => {
-    const a = byName.get(n) || {name:n, label:n, has_key:false, token_hint:'', parallel_ok:true};
+    const a = byName.get(n) || {name:n, label:n, has_key:false, token_hint:'', parallel_ok:true, last_seen_at:0};
     const m = members.get(n);
     const role = m ? m.role : '';
     const key = a.has_key ? `set ····${esc(a.token_hint||'')}` : 'none';
-    const mode = a.parallel_ok ? 'parallel' : 'serial';
     const st = READY[n];
     let readyTxt = '—';
     let readyCls = 'dim-txt';
@@ -326,12 +327,13 @@ function renderTeam(){
       readyTxt = failed.length ? failed.join(', ') : 'blocked';
       readyCls = 'status-txt blocked';
     }
+    const seen = fmtSeen(a.last_seen_at);
     return `<tr>
       <td><span class="name">${esc(a.label)}</span>
         <div class="dim-txt" style="margin:0">${esc(n)}</div></td>
       <td><span class="role-txt">${esc(role || '—')}</span></td>
-      <td><span class="mode-txt">${mode}</span></td>
       <td><span class="${readyCls}">${esc(readyTxt)}</span></td>
+      <td><span class="dim-txt">${esc(seen)}</span></td>
       <td><span class="dim-txt">${key}</span></td>
       <td style="text-align:right;white-space:nowrap">
         <details class="menu">
@@ -443,7 +445,7 @@ function renderBriefs(){
   const members = (BOARD && BOARD.members) || [];
   const rows = members.length ? members : AGENTS.map(a => ({agent:a.name, label:a.label}));
   if(!rows.length){
-    $('brief-rows').innerHTML = '<tr><td colspan="4" class="dim-txt">Add members first.</td></tr>';
+    $('brief-rows').innerHTML = '<tr><td colspan="4" class="dim-txt">No members yet — join an agent, then add a brief.</td></tr>';
     $('brief-edit').classList.add('hidden');
     EDIT_AGENT = null;
     return;
@@ -505,13 +507,18 @@ function renderBriefEditor(){
   $('btn-cancel-brief').onclick = () => { EDIT_AGENT = null; renderBriefs(); };
   $('btn-save-brief').onclick = async () => {
     const body = ta.value.slice(0, MAX_BRIEF);
+    const btn = $('btn-save-brief');
     try {
       await api('/api/roster/briefs', {
         method: 'POST',
         body: JSON.stringify({agent: EDIT_AGENT, body, chat: CHAT}),
       });
-      EDIT_AGENT = null;
-      await refresh();
+      btn.textContent = 'Saved';
+      btn.classList.add('ok');
+      setTimeout(async () => {
+        EDIT_AGENT = null;
+        await refresh();
+      }, 800);
     } catch(e){ alert(e.message); }
   };
 }
@@ -519,6 +526,15 @@ function renderBriefEditor(){
 function esc(s){
   return (s??'').toString().replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function fmtSeen(ts){
+  if(!ts) return 'never';
+  const sec = Math.max(0, (Date.now()/1000) - Number(ts));
+  if(sec < 60) return 'just now';
+  if(sec < 3600) return Math.floor(sec/60) + 'm';
+  if(sec < 86400) return Math.floor(sec/3600) + 'h';
+  return Math.floor(sec/86400) + 'd';
 }
 
 async function mintKey(name){
@@ -559,6 +575,22 @@ $('btn-add-agent').onclick = async () => {
   await api('/api/roster/agents', {method:'POST', body: JSON.stringify({name})});
   $('new-agent').value = '';
   await refresh();
+};
+$('btn-join-agent').onclick = async () => {
+  const name = $('new-agent').value.trim();
+  if(!name) return;
+  try {
+    const d = await api('/api/roster/join', {method:'POST', body: JSON.stringify({
+      agent: name, chat: CHAT, role: 'worker', mint: true,
+    })});
+    $('new-agent').value = '';
+    if(d.token){
+      $('key-agent').textContent = d.agent;
+      $('key-tok').textContent = d.token;
+      $('key-once').classList.remove('hidden');
+    }
+    await refresh();
+  } catch(e){ alert(e.message); }
 };
 
 $('btn-add-task').onclick = async () => {

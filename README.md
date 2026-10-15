@@ -122,6 +122,11 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — Join-the-bus feedback: `GET /api/whoami`, clearer 401
+  hints, `/join/` + `docs/JOIN.md`, Team last-seen, `join_agent` (add +
+  mint), `message_peer` broadcast (`to_agent=all`), combined required-field
+  errors. Designer briefs punch list assessed — kept markdown briefs (not
+  rule rows).
 - **2026-10-15** — **Agent checks:** per-agent gates/poll policy
   (`agent_ready` / `agent_poll` / `get_policy`). Team “Ready” column.
   Comms protocol section added to this README. Docs: `docs/CHECKS.md`.

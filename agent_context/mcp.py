@@ -97,6 +97,12 @@ def _note(brain, args):
                         based_on=based_on, origin=origin,
                         agent=agent or None, to_agent=to_agent or None)
     brain.con.commit()
+    if agent:
+        try:
+            from . import roster
+            roster.touch_last_seen(brain.con, agent)
+        except Exception:
+            pass
     out = {"ok": True, "project": project, "title": title}
     if agent:
         out["agent"] = store._slug_agent(agent)
@@ -174,34 +180,73 @@ def _message_peer(brain, args):
     agent = (args.get("agent") or "").strip()
     to_agent = (args.get("to_agent") or "").strip()
     body = (args.get("body") or args.get("message") or "").strip()
+    missing = []
     if not agent:
-        raise ValueError("agent is required (your name, e.g. hermes)")
+        missing.append("agent (your name, e.g. hermes)")
     if not to_agent:
-        raise ValueError("to_agent is required (peer name, e.g. cursor)")
+        missing.append("to_agent (peer name, or 'all' to broadcast)")
     if not body:
-        raise ValueError("body is required")
+        missing.append("body (message text)")
+    if missing:
+        raise ValueError("required: " + "; ".join(missing))
     project = re.sub(r"[^a-z0-9._-]", "-",
                      (args.get("project") or "peers").lower()).strip("-")[:64] or "peers"
     title = (args.get("title") or "").strip()[:200]
-    if not title:
-        title = f"to-{store._slug_agent(to_agent)}-{int(_time.time())}"
-    # Sanitize title for path segment (no slashes); display title stays clean.
-    safe = re.sub(r"[/\\]+", "-", title).strip("-")[:160] or "msg"
-    nonce = f"{int(_time.time())}-{secrets.token_hex(3)}"
-    path = f"note:{project}/peer/{nonce}/{safe}"
-    sid = store.upsert_source(
-        brain.con, path, "note", project,
-        _time.time(), len(body), _chunk_markdown(f"# {safe}\n\n{body}"))
-    store.set_note_meta(
-        brain.con, sid, confidence=args.get("confidence"),
-        based_on=args.get("sources") if isinstance(args.get("sources"), list) else None,
-        origin="ai", agent=agent, to_agent=to_agent)
+    from_slug = store._slug_agent(agent)
+
+    def _one(to_slug, title_suffix=""):
+        t = title or f"to-{to_slug}-{int(_time.time())}"
+        if title_suffix:
+            t = f"{t}-{title_suffix}" if title else f"to-{to_slug}-{title_suffix}"
+        safe = re.sub(r"[/\\]+", "-", t).strip("-")[:160] or "msg"
+        nonce = f"{int(_time.time())}-{secrets.token_hex(3)}"
+        path = f"note:{project}/peer/{nonce}/{safe}"
+        sid = store.upsert_source(
+            brain.con, path, "note", project,
+            _time.time(), len(body), _chunk_markdown(f"# {safe}\n\n{body}"))
+        store.set_note_meta(
+            brain.con, sid, confidence=args.get("confidence"),
+            based_on=args.get("sources") if isinstance(args.get("sources"), list) else None,
+            origin="ai", agent=from_slug, to_agent=to_slug)
+        return {"id": sid, "title": safe, "to_agent": to_slug}
+
+    # Broadcast: to_agent=all|*|broadcast → every roster agent except sender
+    to_norm = to_agent.strip().lower()
+    if to_norm in ("all", "*", "broadcast"):
+        from . import roster
+        roster.seed_if_needed(brain.con)
+        recipients = [
+            a["name"] for a in roster.list_agents(brain.con)
+            if a["name"] != from_slug
+        ]
+        if not recipients:
+            raise ValueError("no other agents on the roster to broadcast to")
+        sent = [_one(r, title_suffix=r) for r in recipients]
+        brain.con.commit()
+        try:
+            from . import roster as _r
+            _r.touch_last_seen(brain.con, from_slug)
+        except Exception:
+            pass
+        return {
+            "ok": True, "project": project, "broadcast": True,
+            "agent": from_slug,
+            "to_agents": recipients,
+            "ids": [s["id"] for s in sent],
+            "count": len(sent),
+        }
+
+    to_slug = store._slug_agent(to_agent)
+    one = _one(to_slug)
     brain.con.commit()
+    try:
+        from . import roster as _r
+        _r.touch_last_seen(brain.con, from_slug)
+    except Exception:
+        pass
     return {
-        "ok": True, "project": project, "title": safe,
-        "agent": store._slug_agent(agent),
-        "to_agent": store._slug_agent(to_agent),
-        "id": sid,
+        "ok": True, "project": project, "title": one["title"],
+        "agent": from_slug, "to_agent": to_slug, "id": one["id"],
     }
 
 
@@ -317,7 +362,8 @@ TOOLS = [
          "agent": {"type": "string",
                    "description": "Your name (e.g. hermes, grok-bot)."},
          "to_agent": {"type": "string",
-                     "description": "Peer to message (e.g. cursor, dr-eggbot)."},
+                     "description": "Peer name (hermes, cursor, grok-bot, "
+                     "designer, …) or 'all' to broadcast to every roster agent."},
          "body": {"type": "string",
                   "description": "Message text (alias: message)."},
          "message": {"type": "string"},
@@ -426,6 +472,23 @@ TOOLS = [
      "(e.g. peer_inbox) then refresh gates. Call on the agent's poll.every_min.",
      "inputSchema": {"type": "object", "properties": {
          "agent": {"type": "string"}}, "required": ["agent"]}},
+    {"name": "whoami", "description": "Identity check for the calling key. "
+     "Pass the same X-Token you use for MCP. Returns agent name, boards, "
+     "key_ok. Prefer GET /api/whoami with your agent key.",
+     "inputSchema": {"type": "object", "properties": {
+         "token": {"type": "string",
+                   "description": "Agent key to prove (or use GET /api/whoami)."},
+         "agent": {"type": "string",
+                   "description": "Named lookup without proving a key."}}}},
+    {"name": "join_agent", "description": "One-shot join: create roster row, "
+     "add to a board (default peers), mint a view-once key. Removes the "
+     "add-agent-then-mint dance.",
+     "inputSchema": {"type": "object", "properties": {
+         "agent": {"type": "string"}, "label": {"type": "string"},
+         "chat": {"type": "string", "default": "peers"},
+         "role": {"type": "string", "default": "worker"},
+         "mint": {"type": "boolean", "default": True}},
+         "required": ["agent"]}},
 ]
 
 
@@ -562,6 +625,46 @@ def _agent_poll(brain, args):
     return checks.agent_poll(brain.con, args.get("agent") or "")
 
 
+def _whoami(brain, args):
+    from . import roster
+    tok = (args.get("token") or "").strip()
+    if tok:
+        return roster.whoami(brain.con, tok)
+    agent = (args.get("agent") or "").strip()
+    if not agent:
+        raise ValueError(
+            "pass token= (your agent key) or use GET /api/whoami with X-Token")
+    # Named lookup (no key proof) — still useful for admins / diagnostics.
+    agents = {a["name"]: a for a in roster.list_agents(brain.con)}
+    a = agents.get(roster._slug(agent))
+    if not a:
+        raise ValueError(f"unknown agent: {agent}")
+    boards = []
+    for b in roster.list_boards(brain.con):
+        if roster.is_member(brain.con, b["id"], a["name"]):
+            role = next(
+                (m["role"] for m in b["members"] if m["agent"] == a["name"]),
+                "member")
+            boards.append({"chat": b["chat"], "role": role})
+    return {
+        "agent": a["name"], "label": a["label"], "key_ok": None,
+        "has_key": a["has_key"], "boards": boards,
+        "last_seen_at": a["last_seen_at"],
+        "message": "named lookup — pass token= or GET /api/whoami to prove key",
+    }
+
+
+def _join_agent(brain, args):
+    from . import roster
+    return roster.join_agent(
+        brain.con,
+        args.get("agent") or "",
+        chat=args.get("chat"),
+        role=args.get("role") or "worker",
+        mint=False if args.get("mint") is False else True,
+        label=args.get("label"))
+
+
 TOOL_FUNCS = {t["name"]: f for t, f in zip(
     TOOLS, [_search, _ask, _entity, _context_pack, _projects, _stats, _note,
             _add_note, _list_projects, _get_project_summary,
@@ -571,7 +674,7 @@ TOOL_FUNCS = {t["name"]: f for t, f in zip(
             _remove_board_member, _list_tasks, _add_task, _claim_task,
             _update_task, _list_briefs, _get_brief, _set_brief,
             _session_pack, _get_policy, _set_policy, _agent_ready,
-            _agent_poll])}
+            _agent_poll, _whoami, _join_agent])}
 
 
 def handle(brain, msg):
