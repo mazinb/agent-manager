@@ -90,6 +90,7 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — Briefs UI cleaned to Designer Agents language: Team-style table, one open editor, no tutorial/frontmatter dump, quiet route keywords.
 - **2026-10-15** — **Fluid agent briefs** replace the rigid Rules UI:
   one markdown brief per board member (`list_briefs` / `set_brief` /
   `session_pack`), 4KB/brief + 12KB pack caps, hash skip for re-ingest.

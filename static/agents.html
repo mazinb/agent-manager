@@ -96,14 +96,14 @@ tr:last-child td{border-bottom:0}
 .reveal{background:var(--panel);border:1px solid var(--warn);border-radius:4px;padding:12px;margin-top:10px}
 .reveal .tok{font:13px/1.4 ui-monospace,Menlo,monospace;word-break:break-all;margin:0 0 8px}
 
-/* briefs: per-agent markdown, char meter */
-.brief{border-top:1px solid var(--line);padding:12px 0}
-.brief:first-child{border-top:0;padding-top:0}
-.brief .b-head{display:flex;gap:10px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap}
-.brief .b-agent{font:600 13px/1.2 ui-monospace,Menlo,monospace}
-.brief .b-meta{color:var(--dim);font-size:12px}
-.brief .b-routes{color:var(--faint);font-size:12px}
-.brief textarea{width:100%;min-height:110px;font:12.5px/1.45 ui-monospace,Menlo,monospace;resize:vertical}
+/* briefs: table rows + one open editor (matches Team) */
+.brief-edit{padding:10px 8px 14px;border-bottom:1px solid var(--border)}
+.brief-edit textarea{width:100%;min-height:140px;font:12.5px/1.45 ui-monospace,Menlo,monospace;resize:vertical}
+.brief-edit .b-bar{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.brief-edit .b-bar .name{flex:1}
+.brief-edit .b-meter{color:var(--dim);font-size:12px}
+.brief-edit .b-meter.over{color:var(--warn)}
+.brief-edit .actions{margin-top:8px}
 
 @media (max-width:640px){
   .top{padding:0 10px}
@@ -205,11 +205,12 @@ tr:last-child td{border-bottom:0}
 
     <section class="sec">
       <h2>Briefs</h2>
-      <p class="hint" style="margin:0 0 10px">One markdown file per member — ingested at chat start. Cap 4KB each / 12KB pack. Optional frontmatter: <code>routes: on-device=serial, code=parallel</code></p>
-      <div id="briefs"></div>
-      <div class="actions">
-        <button type="button" class="btn primary" id="btn-save-briefs">Save briefs</button>
-      </div>
+      <table>
+        <thead><tr><th>Agent</th><th class="hide-sm">Routes</th><th>Size</th><th></th></tr></thead>
+        <tbody id="brief-rows"></tbody>
+      </table>
+      <div id="brief-edit" class="brief-edit hidden"></div>
+      <p class="hint">Markdown per member. Loaded at chat start.</p>
     </section>
   </div>
 </main>
@@ -218,8 +219,10 @@ const $ = id => document.getElementById(id);
 const KEY = 'am_token';
 let TOK = localStorage.getItem(KEY) || '';
 let AGENTS = [], TASKS = [], BRIEFS = [], BOARDS = [], BOARD = null;
+let EDIT_AGENT = null;
 const params = new URLSearchParams(location.search);
 let CHAT = params.get('chat') || 'peers';
+const MAX_BRIEF = 4000;
 
 async function api(path, opts={}){
   const r = await fetch(path, {
@@ -402,30 +405,92 @@ function renderTasks(){
   });
 }
 
+function briefBy(agent){
+  return BRIEFS.find(b => b.agent === agent) ||
+    {agent, body:'', chars:0, max_chars:MAX_BRIEF, routes:[]};
+}
+
+function routeLabel(b){
+  const rs = b.routes || [];
+  if(!rs.length) return '—';
+  return rs.map(r => r.match + (r.parallel ? ' ∥' : '')).join(', ');
+}
+
 function renderBriefs(){
   const members = (BOARD && BOARD.members) || [];
-  const by = Object.fromEntries(BRIEFS.map(b => [b.agent, b]));
-  // Show every member — empty body if no brief yet.
   const rows = members.length ? members : AGENTS.map(a => ({agent:a.name, label:a.label}));
-  $('briefs').innerHTML = rows.map(m => {
+  if(!rows.length){
+    $('brief-rows').innerHTML = '<tr><td colspan="4" class="dim-txt">Add members first.</td></tr>';
+    $('brief-edit').classList.add('hidden');
+    EDIT_AGENT = null;
+    return;
+  }
+  $('brief-rows').innerHTML = rows.map(m => {
     const agent = m.agent || m.name;
-    const b = by[agent] || {body:'', chars:0, max_chars:4000, routes:[]};
-    const routes = (b.routes || []).map(r =>
-      `${r.match}${r.parallel ? '=parallel' : '=serial'}`).join(', ') || '—';
-    return `<div class="brief" data-agent="${esc(agent)}">
-      <div class="b-head">
-        <span class="b-agent">${esc(m.label || agent)}</span>
-        <span class="b-meta"><span class="b-chars">${b.chars || 0}</span>/${b.max_chars || 4000}</span>
-        <span class="b-routes">routes ${esc(routes)}</span>
-      </div>
-      <textarea class="b-body" spellcheck="false" placeholder="---&#10;routes: keyword=serial&#10;---&#10;&#10;# ${esc(agent)}&#10;&#10;What this agent does on this chat…">${esc(b.body || '')}</textarea>
-    </div>`;
-  }).join('') || '<p class="hint">Add board members to write briefs.</p>';
-  $('briefs').querySelectorAll('.brief').forEach(el => {
-    const ta = el.querySelector('.b-body');
-    const meter = el.querySelector('.b-chars');
-    ta.oninput = () => { meter.textContent = ta.value.length; };
+    const b = briefBy(agent);
+    const open = EDIT_AGENT === agent;
+    return `<tr data-agent="${esc(agent)}">
+      <td class="name">${esc(m.label || agent)}</td>
+      <td class="dim-txt hide-sm">${esc(routeLabel(b))}</td>
+      <td class="dim-txt">${b.chars || 0}</td>
+      <td style="text-align:right">
+        <button type="button" class="btn ghost b-edit" data-agent="${esc(agent)}" style="height:30px;padding:0 10px">${open ? 'Close' : 'Edit'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+  $('brief-rows').querySelectorAll('.b-edit').forEach(btn => {
+    btn.onclick = () => {
+      const a = btn.dataset.agent;
+      EDIT_AGENT = EDIT_AGENT === a ? null : a;
+      renderBriefs();
+    };
   });
+  renderBriefEditor();
+}
+
+function renderBriefEditor(){
+  const box = $('brief-edit');
+  if(!EDIT_AGENT){
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    return;
+  }
+  const members = (BOARD && BOARD.members) || [];
+  const m = members.find(x => x.agent === EDIT_AGENT) ||
+    AGENTS.find(x => x.name === EDIT_AGENT) || {agent: EDIT_AGENT, label: EDIT_AGENT};
+  const b = briefBy(EDIT_AGENT);
+  const label = m.label || m.agent || EDIT_AGENT;
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    <div class="b-bar">
+      <span class="name">${esc(label)}</span>
+      <span class="b-meter" id="b-meter">${(b.body || '').length}/${MAX_BRIEF}</span>
+    </div>
+    <textarea id="b-body" spellcheck="false" placeholder="# ${esc(EDIT_AGENT)}">${esc(b.body || '')}</textarea>
+    <div class="actions">
+      <button type="button" class="btn primary" id="btn-save-brief">Save</button>
+      <button type="button" class="btn ghost" id="btn-cancel-brief">Cancel</button>
+    </div>`;
+  const ta = $('b-body');
+  const meter = $('b-meter');
+  const sync = () => {
+    const n = ta.value.length;
+    meter.textContent = n + '/' + MAX_BRIEF;
+    meter.classList.toggle('over', n > MAX_BRIEF);
+  };
+  ta.oninput = sync;
+  $('btn-cancel-brief').onclick = () => { EDIT_AGENT = null; renderBriefs(); };
+  $('btn-save-brief').onclick = async () => {
+    const body = ta.value.slice(0, MAX_BRIEF);
+    try {
+      await api('/api/roster/briefs', {
+        method: 'POST',
+        body: JSON.stringify({agent: EDIT_AGENT, body, chat: CHAT}),
+      });
+      EDIT_AGENT = null;
+      await refresh();
+    } catch(e){ alert(e.message); }
+  };
 }
 
 function esc(s){
@@ -451,6 +516,7 @@ $('btn-refresh').onclick = () => refresh().catch(e => alert(e.message));
 
 $('board-sel').onchange = async () => {
   CHAT = $('board-sel').value;
+  EDIT_AGENT = null;
   history.replaceState(null, '', '?chat=' + encodeURIComponent(CHAT));
   await refresh();
 };
@@ -486,19 +552,6 @@ $('btn-add-task').onclick = async () => {
     $('task-title').value = '';
     await refresh();
   } catch(e){ alert(e.message); }
-};
-
-$('btn-save-briefs').onclick = async () => {
-  const rows = [...$('briefs').querySelectorAll('.brief')];
-  for (const el of rows) {
-    const agent = el.dataset.agent;
-    const body = el.querySelector('.b-body').value;
-    await api('/api/roster/briefs', {
-      method: 'POST',
-      body: JSON.stringify({agent, body, chat: CHAT}),
-    });
-  }
-  await refresh();
 };
 
 // gate
