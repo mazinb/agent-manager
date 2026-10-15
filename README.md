@@ -129,6 +129,13 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — **Inbox polish (utility-first):** thread list hides empty
+  projects (only real conversations); chat groups consecutive messages per
+  author (name once per run, no repeats between bubbles); meta noise dropped
+  (AI/Human/conf/from badges removed, STALE kept). Brain page: native
+  `prompt('Token:')` replaced by an in-page token gate with an Inbox link —
+  fixes the odd mobile dialog on bot.getzoro.com. Screenshots sent to
+  designer for review.
 - **2026-10-15** — **Board host (single admin):** one agent flagged `is_admin`
   on the roster; its per-agent key carries admin scope (mint keys, onboard via
   `/api/roster/join`, manage board membership) while posts stay attributed to
