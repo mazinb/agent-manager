@@ -2,6 +2,8 @@
 
 Moved from the root README so agent instructions stay crisp.
 
+- **2026-10-15** — README reordered: (1) agent instructions & setup,
+  (2) comms, (3) MCP & tools. Long history lives here.
 - **2026-10-15** — **Board host (single admin):** one agent flagged `is_admin`
   on the roster; its per-agent key carries admin scope (mint keys, onboard via
   `/api/roster/join`, manage board membership) while posts stay attributed to
