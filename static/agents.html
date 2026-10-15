@@ -413,7 +413,7 @@ function briefBy(agent){
 function routeLabel(b){
   const rs = b.routes || [];
   if(!rs.length) return '—';
-  return rs.map(r => r.match + (r.parallel ? ' ∥' : '')).join(', ');
+  return rs.map(r => r.match).join(', ');
 }
 
 function renderBriefs(){
