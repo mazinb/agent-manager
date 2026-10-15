@@ -110,7 +110,8 @@ body.inbox #inbox-app{display:flex}
 .ping .orb{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .ping b{color:var(--dim);font-weight:600}
 
-.msg{display:flex;flex-direction:column;margin:4px 0;max-width:78%}
+.msg{display:flex;flex-direction:column;margin:2px 0;max-width:78%}
+.msg.first{margin-top:10px}
 .msg.ai{align-self:flex-start}
 .msg.human{align-self:flex-end;align-items:flex-end}
 .msg .who{font-size:10.5px;color:var(--faint);margin:0 0 2px 4px;letter-spacing:.04em}
@@ -125,13 +126,7 @@ body.inbox #inbox-app{display:flex}
 .meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;
   font-size:10.5px;color:var(--faint);margin:3px 4px 8px}
 .badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:4px}
-.b-ai{background:#241f19;color:#c9b391}
-.b-human{background:#1d2a1f;color:#8fc9a0}
-.b-conf{background:#26221c;color:#c9a77f}
-.b-ok{background:#1d2a1f;color:#8fc9a0}
 .b-stale{background:#2a1d1b;color:var(--stale)}
-.meta .from{color:var(--faint);font-family:ui-monospace,Menlo,monospace;font-size:10px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
 
 .composer{border-top:1px solid var(--border);background:var(--panel);
   padding:10px 10px calc(10px + env(safe-area-inset-bottom))}
@@ -383,13 +378,14 @@ async function enterInbox(){
 
 function renderList(){
   const el = $('proj-list');
-  if(!PROJECTS.length){
+  // only threads with actual activity — empty projects add no value
+  const withNotes = PROJECTS.filter(p => p.note_count > 0);
+  if(!withNotes.length){
     el.innerHTML = '<div class="empty">No threads yet.</div>';
     return;
   }
-  // projects with notes first, then newest activity
-  const rows = PROJECTS.slice().sort((a,b) =>
-    ((b.note_count>0)-(a.note_count>0)) || (b.last_ts||0)-(a.last_ts||0));
+  // newest activity first
+  const rows = withNotes.slice().sort((a,b) => (b.last_ts||0)-(a.last_ts||0));
   el.innerHTML = rows.map(p => {
     // unread = activity newer than what was last opened on this device
     const unread = p.last_ts && p.last_ts > (SEEN[p.project]||0);
@@ -487,15 +483,8 @@ function closeChat(){
 }
 
 function badges(n){
-  const o = n.origin === 'human'
-    ? '<span class="badge b-human">Human</span>'
-    : '<span class="badge b-ai">'+(n.agent ? esc(n.agent) : 'AI')+'</span>';
-  const c = n.confidence != null ? '<span class="badge b-conf">conf '+Math.round(n.confidence*100)+'%</span>' : '';
-  const s = n.stale ? '<span class="badge b-stale">STALE</span>'
-                    : (n.verified_at ? '<span class="badge b-ok">'+ago(n.verified_at)+'</span>' : '');
-  const src = (n.sources && n.sources.length) ? n.sources : (n.based_on||[]);
-  const f = src.length ? '<span class="from">from '+esc(src.join(', '))+'</span>' : '';
-  return o+c+s+f;
+  // minimal: only surface staleness; author is already on the bubble
+  return n.stale ? '<span class="badge b-stale">STALE</span>' : '';
 }
 
 function renderChat(){
@@ -509,25 +498,29 @@ function renderChat(){
     st.innerHTML = '<div class="empty">Empty.</div>';
     return;
   }
-  let html = '', lastDay = '';
+  let html = '', lastDay = '', lastWho = null;
   NOTES.forEach(n => {
     const d = dayOf(n.verified_at || 0);
-    if(d !== lastDay){ html += '<div class="day"><span>'+d+'</span></div>'; lastDay = d; }
+    if(d !== lastDay){ html += '<div class="day"><span>'+d+'</span></div>'; lastDay = d; lastWho = null; }
     // Grok-style "Messaged ● peer" line when an agent messages another
     if(n.to_agent){
       const col = orbColor(n.to_agent);
       html += '<div class="ping" style="--orb:'+col+'"><span class="orb" style="background:'+col+'"></span>Messaged <b>'+esc(prettyAgent(n.to_agent))+'</b></div>';
+      lastWho = null;
     }
     const who = n.origin === 'human' ? 'You'
               : (n.agent ? prettyAgent(n.agent) : 'Brain');
+    // author name once per run — repeating it between messages adds no value
+    const showWho = who !== lastWho;
+    lastWho = who;
     html +=
-      '<div class="msg '+esc(n.origin||'ai')+'">' +
-        '<div class="who">'+esc(who)+'</div>' +
+      '<div class="msg '+esc(n.origin||'ai')+(showWho ? ' first' : '')+'">' +
+        (showWho ? '<div class="who">'+esc(who)+'</div>' : '') +
         '<div class="bubble">' +
           (n.title ? '<div class="b-title">'+esc(n.title)+'</div>' : '') +
           esc(n.body||'') +
         '</div>' +
-        '<div class="meta">'+badges(n)+'</div>' +
+        (n.stale ? '<div class="meta">'+badges(n)+'</div>' : '') +
       '</div>';
   });
   st.innerHTML = html;
