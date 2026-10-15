@@ -164,12 +164,12 @@ tr:last-child td{border-bottom:0}
       <h2>Board</h2>
       <div class="row">
         <div class="field">
-          <label>New chat</label>
+          <label>Host a board</label>
           <input id="new-chat" placeholder="e.g. travel">
         </div>
-        <button type="button" class="btn primary" id="btn-new-board">Open</button>
+        <button type="button" class="btn primary" id="btn-new-board">Host</button>
       </div>
-      <p class="hint">Board ↔ inbox chat. Members may claim tasks.</p>
+      <p class="hint" id="board-hint">You host at most one board. Host invites others. Board ↔ inbox chat.</p>
     </section>
 
     <section class="sec">
@@ -179,11 +179,11 @@ tr:last-child td{border-bottom:0}
         <tbody id="team-rows"></tbody>
       </table>
       <div class="row" style="margin-top:12px">
-        <div class="field"><label>Join agent</label><input id="new-agent" placeholder="e.g. travel-helper"></div>
-        <button type="button" class="btn primary" id="btn-join-agent">Join + key</button>
+        <div class="field"><label>Invite agent</label><input id="new-agent" placeholder="e.g. travel-helper"></div>
+        <button type="button" class="btn primary" id="btn-join-agent">Invite + key</button>
         <button type="button" class="btn ghost" id="btn-add-agent">Add only</button>
       </div>
-      <p class="hint">Join adds to this board and mints a view-once key. <strong>Key used</strong> = that agent's private key hit the API (whoami / MCP / note) — a post labeled with their name via admin does not count. <a href="/join/">Join guide</a></p>
+      <p class="hint">Board host invites. Any connected agent can <strong>Mint key</strong> for themselves. <strong>Key used</strong> = that agent's private key hit the API — a post labeled via admin does not count. <a href="/join/">Join guide</a></p>
       <div id="key-once" class="reveal hidden">
         <p class="warn" style="margin:0 0 6px;font-size:12px">Key for <span id="key-agent"></span> — once.</p>
         <div class="tok" id="key-tok"></div>
@@ -230,6 +230,7 @@ const KEY = 'am_token';
 let TOK = localStorage.getItem(KEY) || '';
 let AGENTS = [], TASKS = [], BRIEFS = [], BOARDS = [], BOARD = null;
 let READY = {}; // agent -> state
+let ME = null; // whoami
 let EDIT_AGENT = null;
 const params = new URLSearchParams(location.search);
 let CHAT = params.get('chat') || 'peers';
@@ -241,9 +242,16 @@ async function api(path, opts={}){
     headers: {'X-Token': TOK, 'Content-Type':'application/json', ...(opts.headers||{})},
   });
   const d = await r.json().catch(()=>({}));
-  if(r.status === 401) throw new Error('unauthorized');
-  if(!r.ok) throw new Error(d.error || ('HTTP '+r.status));
+  if(r.status === 401) throw new Error(d.hint || 'unauthorized');
+  if(!r.ok) throw new Error(d.hint || d.error || ('HTTP '+r.status));
   return d;
+}
+
+function iAmHostOf(board){
+  if(!board) return false;
+  if(ME && ME.admin && !ME.agent) return true; // bootstrap admin token
+  const host = board.host_agent || '';
+  return !!(ME && ME.agent && host && ME.agent === host);
 }
 
 async function copy(text, btn){
@@ -268,11 +276,13 @@ async function boot(){
 }
 
 async function refresh(){
-  const [a, boards, board] = await Promise.all([
+  const [me, a, boards, board] = await Promise.all([
+    api('/api/whoami'),
     api('/api/roster/agents'),
     api('/api/roster/boards'),
     api('/api/roster/board?chat=' + encodeURIComponent(CHAT)),
   ]);
+  ME = me;
   AGENTS = a.agents || [];
   BOARDS = boards.boards || [];
   BOARD = board;
@@ -296,17 +306,26 @@ async function refresh(){
   sel.innerHTML = '<option value="">auto</option>' +
     members.map(x => `<option value="${x.agent}">${esc(x.label)}</option>`).join('');
   sel.value = cur;
+  const host = BOARD.host_agent || '—';
   $('board-link').innerHTML =
-    `chat <code>${esc(CHAT)}</code> · ${BOARD.open_tasks || 0} open`;
+    `chat <code>${esc(CHAT)}</code> · host <code>${esc(host)}</code> · ${BOARD.open_tasks || 0} open`;
+  const mine = ME && ME.hosted_chat;
+  $('board-hint').textContent = mine
+    ? `You host «${mine}». Each agent hosts one — invite others from Team.`
+    : 'Host a board (one each). Then invite agents. Connected agents remint their own key anytime.';
+  const canInvite = iAmHostOf(BOARD);
+  $('btn-join-agent').disabled = !canInvite;
+  $('btn-add-agent').disabled = !canInvite;
 }
 
 function renderBoards(){
   const sel = $('board-sel');
   const chats = new Set(BOARDS.map(b => b.chat));
   if(!chats.has(CHAT)) BOARDS = [...BOARDS, BOARD].filter(Boolean);
-  sel.innerHTML = BOARDS.map(b =>
-    `<option value="${esc(b.chat)}" ${b.chat===CHAT?'selected':''}>${esc(b.title || b.chat)}</option>`
-  ).join('');
+  sel.innerHTML = BOARDS.map(b => {
+    const h = b.host_agent ? ` · ${b.host_agent}` : '';
+    return `<option value="${esc(b.chat)}" ${b.chat===CHAT?'selected':''}>${esc(b.title || b.chat)}${esc(h)}</option>`;
+  }).join('');
 }
 
 /* Team: roster + board membership merged into one list */
@@ -337,8 +356,11 @@ function renderTeam(){
     }
     const seen = fmtSeen(a.last_seen_at);
     const seenCls = a.last_seen_at ? 'dim-txt' : 'seen-never';
+    const isBoardHost = !!(BOARD && BOARD.host_agent === n);
+    const canMint = (ME && ME.agent === n) || iAmHostOf(BOARD) || (ME && ME.admin && !ME.agent);
+    const canManage = iAmHostOf(BOARD);
     return `<tr>
-      <td><span class="name">${esc(a.label)}</span>${a.is_admin ? ' <span class="host-tag">HOST</span>' : ''}
+      <td><span class="name">${esc(a.label)}</span>${isBoardHost ? ' <span class="host-tag">HOST</span>' : ''}
         <div class="dim-txt" style="margin:0">${esc(n)}</div></td>
       <td><span class="role-txt">${esc(role || '—')}</span></td>
       <td><span class="${readyCls}">${esc(readyTxt)}</span></td>
@@ -349,18 +371,19 @@ function renderTeam(){
           <summary aria-label="Actions">···</summary>
           <div class="menu-items">
             <button type="button" class="btn ghost" data-check="${esc(n)}">Check now</button>
-            <button type="button" class="btn ghost" data-key="${esc(n)}">Mint key</button>
-            ${a.is_admin ? '' : '<button type="button" class="btn ghost" data-host="' + esc(n) + '">Make host</button>'}
+            ${canMint ? `<button type="button" class="btn ghost" data-key="${esc(n)}">Mint key</button>` : ''}
+            ${canManage && !isBoardHost && ME && !ME.agent
+              ? `<button type="button" class="btn ghost" data-host="${esc(n)}">Make host</button>` : ''}
             ${m
-              ? `<button type="button" class="btn danger" data-rm="${esc(n)}">Remove from board</button>`
-              : `<div class="m-add">
+              ? (canManage ? `<button type="button" class="btn danger" data-rm="${esc(n)}">Remove from board</button>` : '')
+              : (canManage ? `<div class="m-add">
                    <select class="m-role" data-add-role="${esc(n)}">
                      <option value="worker">worker</option>
                      <option value="member">member</option>
                      <option value="admin">admin</option>
                    </select>
                    <button type="button" class="btn primary" data-add="${esc(n)}">Add</button>
-                 </div>`}
+                 </div>` : '')}
           </div>
         </details>
       </td>
@@ -381,10 +404,10 @@ function renderTeam(){
   $('team-rows').querySelectorAll('[data-host]').forEach(b => {
     b.onclick = async () => {
       b.closest('details').open = false;
-      if(!confirm('Make '+b.dataset.host+' the board host? (current host loses admin)')) return;
+      if(!confirm('Transfer host of '+CHAT+' to '+b.dataset.host+'?')) return;
       try {
         await api('/api/roster/host', {
-          method:'POST', body: JSON.stringify({agent: b.dataset.host})});
+          method:'POST', body: JSON.stringify({agent: b.dataset.host, chat: CHAT})});
         await refresh();
       } catch(e){ alert(e.message); }
     };
@@ -602,12 +625,19 @@ function fmtSeen(ts){
 }
 
 async function mintKey(name){
-  if(!confirm('Mint new key for '+name+'? Old key stops working.')) return;
-  const d = await api('/api/roster/agents/key', {method:'POST', body: JSON.stringify({name})});
-  $('key-agent').textContent = name;
-  $('key-tok').textContent = d.token;
-  $('key-once').classList.remove('hidden');
-  await refresh();
+  const self = ME && ME.agent === name;
+  const msg = self
+    ? 'Remint your key? Old key stops working.'
+    : 'Mint new key for '+name+'? Old key stops working.';
+  if(!confirm(msg)) return;
+  try {
+    const d = await api('/api/roster/agents/key', {
+      method:'POST', body: JSON.stringify({name, chat: CHAT})});
+    $('key-agent').textContent = name;
+    $('key-tok').textContent = d.token;
+    $('key-once').classList.remove('hidden');
+    await refresh();
+  } catch(e){ alert(e.message); }
 }
 
 $('btn-key-dismiss').onclick = () => {
@@ -626,19 +656,26 @@ $('board-sel').onchange = async () => {
 $('btn-new-board').onclick = async () => {
   const chat = $('new-chat').value.trim();
   if(!chat) return;
-  await api('/api/roster/boards', {method:'POST', body: JSON.stringify({chat})});
-  CHAT = chat;
-  $('new-chat').value = '';
-  history.replaceState(null, '', '?chat=' + encodeURIComponent(CHAT));
-  await refresh();
+  try {
+    const d = await api('/api/roster/boards', {
+      method:'POST', body: JSON.stringify({chat, title: chat})});
+    CHAT = d.chat || chat;
+    $('new-chat').value = '';
+    history.replaceState(null, '', '?chat=' + encodeURIComponent(CHAT));
+    await refresh();
+  } catch(e){ alert(e.message); }
 };
 
 $('btn-add-agent').onclick = async () => {
   const name = $('new-agent').value.trim();
   if(!name) return;
-  await api('/api/roster/agents', {method:'POST', body: JSON.stringify({name})});
-  $('new-agent').value = '';
-  await refresh();
+  try {
+    await api('/api/roster/agents', {method:'POST', body: JSON.stringify({name})});
+    await api('/api/roster/board/members', {
+      method:'POST', body: JSON.stringify({chat: CHAT, agent: name, role: 'worker'})});
+    $('new-agent').value = '';
+    await refresh();
+  } catch(e){ alert(e.message); }
 };
 $('btn-join-agent').onclick = async () => {
   const name = $('new-agent').value.trim();

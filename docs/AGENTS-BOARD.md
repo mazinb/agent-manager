@@ -11,18 +11,20 @@ who have access and can claim work.
 
 | Piece | What |
 |-------|------|
-| **Board** | One per inbox chat slug (`peers`, `travel`, …) |
-| **Members** | Agents with access (`member` / `worker` / `admin`) |
-| **Roster** | Named agents; each can mint its own API key (view once) |
+| **Board** | One per inbox chat slug (`peers`, `travel`, …); each has a **host** |
+| **Host** | One agent per board; each agent hosts **at most one** board |
+| **Members** | Agents with access (`member` / `worker` / `admin`) — host invites |
+| **Roster** | Named agents; connected agents remint their own key (view once) |
 | **Tasks** | Per-board list: open → claimed → done |
 | **Briefs** | Per-member markdown (ingested at chat start); optional `routes:` frontmatter for auto-assign |
 | **UI** | `/agents/?chat=peers` · Inbox chat shows board strip |
 
 ## Access
 
-- Creating a board (or opening a chat) seeds `hermes`, `cursor`, `grok-bot` as workers.
+- **Host a board** from `/agents/` (or MCP `create_board`) — you become host; no default workers seeded.
+- Shared `peers` keeps seeded workers; its host invites others.
 - **Claim** and **assign** require membership on that board.
-- Add more agents from `/agents/` → Members, or MCP `add_board_member`.
+- Invites: host uses Invite + key / MCP `join_agent`. Connected agents **Mint key** for themselves anytime.
 
 ## Parallel
 
@@ -52,8 +54,9 @@ You execute on-device work…
 
 ## MCP
 
-`list_roster` · `list_boards` · `get_board` · `add_board_member` ·
-`remove_board_member` · `list_tasks` · `add_task` · `claim_task` ·
-`update_task` · `list_briefs` · `get_brief` · `set_brief` · `session_pack`
+`list_roster` · `list_boards` · `get_board` · `create_board` · `mint_key` ·
+`add_board_member` · `remove_board_member` · `list_tasks` · `add_task` ·
+`claim_task` · `update_task` · `list_briefs` · `get_brief` · `set_brief` ·
+`session_pack` · `join_agent`
 
 Cursor plans → `add_task(chat=…)` → Hermes `claim_task` → `update_task(done)`.

@@ -218,13 +218,21 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def _is_host(self):
-        """Admin scope: bootstrap admin token OR the host agent's key."""
+        """Bootstrap admin OR any board-hosting agent key."""
         return roster.resolve_admin(
             BRAIN.con, presented_token(self), ADMIN_TOKEN or "")
 
     def _is_bootstrap_admin(self):
         tok = presented_token(self)
         return bool(ADMIN_TOKEN) and secrets.compare_digest(tok, ADMIN_TOKEN)
+
+    def _caller_agent(self):
+        return roster.agent_token_ok(BRAIN.con, presented_token(self))
+
+    def _can_manage_board(self, chat=None, board_id=None):
+        return roster.can_manage_board(
+            BRAIN.con, presented_token(self), ADMIN_TOKEN or "",
+            chat=chat, board_id=board_id)
 
     def _unauth(self):
         """Clearer 401 — name what's missing so agents aren't silent failures."""
@@ -633,21 +641,6 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._unauth()
 
-        # Host-gated endpoints: only the bootstrap admin token or the host
-        # agent's key may mint keys, onboard agents, or manage membership.
-        if path in (
-            "/api/roster/agents", "/api/roster/agents/key",
-            "/api/roster/board/members", "/api/roster/board/members/remove",
-            "/api/roster/join",
-        ) and not self._is_host():
-            return self._json(403, {
-                "error": "forbidden",
-                "hint": "admin scope needed — this endpoint is limited to "
-                        "the host agent's key or the bootstrap admin token. "
-                        "Ask the board host (see /api/roster/agents "
-                        "is_admin=true).",
-            })
-
         try:
             payload = self._read_json()
         except Exception:
@@ -663,10 +656,18 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self._json(200, roster.set_host(
                     BRAIN.con, payload.get("agent") or "",
-                    on=False if payload.get("on") is False else True))
+                    on=False if payload.get("on") is False else True,
+                    chat=payload.get("chat")))
             except ValueError as e:
                 return self._json(400, {"error": str(e)})
         if path == "/api/roster/agents":
+            # Roster upsert: bootstrap or any board host (invite prep).
+            if not self._is_host():
+                return self._json(403, {
+                    "error": "forbidden",
+                    "hint": "add agents with a board-host key or admin token "
+                            "(or Host board first). Connected agents remint "
+                            "their own key via Mint key."})
             try:
                 return self._json(200, roster.upsert_agent(
                     BRAIN.con, payload.get("name") or "",
@@ -675,26 +676,54 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self._json(400, {"error": str(e)})
         if path == "/api/roster/agents/key":
+            # Self-mint for any connected agent; host/admin for others.
             try:
-                return self._json(201, roster.mint_agent_key(
-                    BRAIN.con, payload.get("name") or ""))
+                return self._json(201, roster.mint_for_caller(
+                    BRAIN.con, presented_token(self),
+                    name=payload.get("name") or "",
+                    admin_token=ADMIN_TOKEN or "",
+                    chat=payload.get("chat")))
+            except PermissionError as e:
+                return self._json(403, {"error": "forbidden", "hint": str(e)})
             except ValueError as e:
                 return self._json(400, {"error": str(e)})
         if path == "/api/roster/boards":
+            # Connected agent → host their own board (one each).
+            # Bootstrap may still open shared boards (legacy seed).
             try:
-                return self._json(201, roster.get_or_create_board(
-                    BRAIN.con,
-                    payload.get("chat") or "",
-                    title=payload.get("title") or ""))
+                chat = payload.get("chat") or ""
+                title = payload.get("title") or ""
+                caller = self._caller_agent()
+                if self._is_bootstrap_admin() and payload.get("shared"):
+                    return self._json(201, roster.get_or_create_board(
+                        BRAIN.con, chat, title=title))
+                if not caller and not self._is_bootstrap_admin():
+                    return self._json(403, {
+                        "error": "forbidden",
+                        "hint": "use an agent key to host a board, or the "
+                                "bootstrap admin token"})
+                host = caller or (payload.get("host") or "")
+                if not host:
+                    return self._json(400, {
+                        "error": "host required for shared=false board"})
+                return self._json(201, roster.create_hosted_board(
+                    BRAIN.con, chat, host, title=title))
             except ValueError as e:
                 return self._json(400, {"error": str(e)})
         if path == "/api/roster/board/members":
             try:
                 bid = payload.get("board_id")
+                chat = payload.get("chat")
+                if not self._can_manage_board(
+                        chat=chat,
+                        board_id=int(bid) if bid not in (None, "") else None):
+                    return self._json(403, {
+                        "error": "forbidden",
+                        "hint": "only this board's host (or admin) can invite"})
                 return self._json(200, roster.add_member(
                     BRAIN.con,
                     board_id=int(bid) if bid not in (None, "") else None,
-                    chat=payload.get("chat"),
+                    chat=chat,
                     agent=payload.get("agent") or "",
                     role=payload.get("role") or "worker"))
             except (ValueError, TypeError) as e:
@@ -702,10 +731,17 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/roster/board/members/remove":
             try:
                 bid = payload.get("board_id")
+                chat = payload.get("chat")
+                if not self._can_manage_board(
+                        chat=chat,
+                        board_id=int(bid) if bid not in (None, "") else None):
+                    return self._json(403, {
+                        "error": "forbidden",
+                        "hint": "only this board's host (or admin) can remove"})
                 return self._json(200, roster.remove_member(
                     BRAIN.con,
                     board_id=int(bid) if bid not in (None, "") else None,
-                    chat=payload.get("chat"),
+                    chat=chat,
                     agent=payload.get("agent") or ""))
             except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
@@ -801,11 +837,20 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
         if path == "/api/roster/join":
+            # Board host (or bootstrap) invites + optional mint.
+            chat = payload.get("chat") or roster.DEFAULT_CHAT
+            if not self._can_manage_board(chat=chat):
+                return self._json(403, {
+                    "error": "forbidden",
+                    "hint": "only this board's host (or admin) can join/"
+                            "invite agents. Connected agents Mint key for "
+                            "themselves. Host a board first if you need to "
+                            "invite others."})
             try:
                 return self._json(201, roster.join_agent(
                     BRAIN.con,
                     payload.get("agent") or payload.get("name") or "",
-                    chat=payload.get("chat"),
+                    chat=chat,
                     role=payload.get("role") or "worker",
                     mint=False if payload.get("mint") is False else True,
                     label=payload.get("label")))
@@ -817,12 +862,31 @@ class Handler(BaseHTTPRequestHandler):
             # (connect --project X writes this into the client's MCP config)
             qs = {k: v[0] for k, v in
                   parse_qs(urlparse(self.path).query).items()}
-            if (payload.get("method") == "tools/call"
-                    and (payload.get("params") or {}).get("name") in ("search", "ask")
-                    and qs.get("project")):
+            if payload.get("method") == "tools/call":
+                tname = (payload.get("params") or {}).get("name")
                 args = payload["params"].setdefault("arguments", {}) or {}
-                if not args.get("project"):
-                    args["project"] = qs["project"]
+                payload["params"]["arguments"] = args
+                if tname in ("search", "ask") and qs.get("project"):
+                    if not args.get("project"):
+                        args["project"] = qs["project"]
+                # Inject caller identity from X-Token for host/mint tools.
+                tok = presented_token(self)
+                caller = roster.agent_token_ok(BRAIN.con, tok) if tok else None
+                if tname in ("mint_key", "whoami") and tok and not args.get("token"):
+                    args["token"] = tok
+                if tname == "create_board" and caller and not args.get("host"):
+                    args["host"] = caller
+                if tname == "join_agent" and not self._can_manage_board(
+                        chat=args.get("chat") or roster.DEFAULT_CHAT):
+                    return self._json(200, {
+                        "jsonrpc": "2.0",
+                        "id": payload.get("id"),
+                        "error": {
+                            "code": -32001,
+                            "message": "forbidden — only this board's host "
+                                       "(or admin) can invite",
+                        },
+                    })
             resp = mcp.handle(BRAIN, payload)
             if resp is None:
                 return self._json(202, {})

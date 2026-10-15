@@ -482,14 +482,32 @@ TOOLS = [
                    "description": "Agent key to prove (or use GET /api/whoami)."},
          "agent": {"type": "string",
                    "description": "Named lookup without proving a key."}}}},
-    {"name": "join_agent", "description": "One-shot join: create roster row, "
-     "add to a board (default peers), mint a view-once key. Removes the "
-     "add-agent-then-mint dance.",
+    {"name": "join_agent", "description": "Invite onto a board (host/admin): "
+     "roster row + membership + optional view-once key. Caller must host "
+     "that board (or use bootstrap admin).",
      "inputSchema": {"type": "object", "properties": {
          "agent": {"type": "string"}, "label": {"type": "string"},
          "chat": {"type": "string", "default": "peers"},
          "role": {"type": "string", "default": "worker"},
          "mint": {"type": "boolean", "default": True}},
+         "required": ["agent"]}},
+    {"name": "create_board", "description": "Host your own board (one per "
+     "agent). You become host; invite others with join_agent. Does not seed "
+     "default workers.",
+     "inputSchema": {"type": "object", "properties": {
+         "chat": {"type": "string"},
+         "host": {"type": "string",
+                  "description": "Host agent (defaults to calling agent)."},
+         "title": {"type": "string"}},
+         "required": ["chat"]}},
+    {"name": "mint_key", "description": "Remint a view-once agent key. "
+     "Any connected agent may remint their own; board hosts remint invitees.",
+     "inputSchema": {"type": "object", "properties": {
+         "agent": {"type": "string"},
+         "token": {"type": "string",
+                   "description": "Caller key (or rely on X-Token)."},
+         "chat": {"type": "string",
+                  "description": "Board chat when minting for someone else."}},
          "required": ["agent"]}},
 ]
 
@@ -684,6 +702,27 @@ def _join_agent(brain, args):
         label=args.get("label"))
 
 
+def _create_board(brain, args):
+    from . import roster
+    host = (args.get("host") or args.get("agent") or "").strip()
+    if not host:
+        raise ValueError("host required (your agent name)")
+    return roster.create_hosted_board(
+        brain.con,
+        args.get("chat") or "",
+        host,
+        title=args.get("title") or "")
+
+
+def _mint_key(brain, args):
+    from . import roster
+    tok = (args.get("token") or "").strip()
+    return roster.mint_for_caller(
+        brain.con, tok,
+        name=args.get("agent") or "",
+        chat=args.get("chat"))
+
+
 TOOL_FUNCS = {t["name"]: f for t, f in zip(
     TOOLS, [_search, _ask, _entity, _context_pack, _projects, _stats, _note,
             _add_note, _list_projects, _get_project_summary,
@@ -693,7 +732,8 @@ TOOL_FUNCS = {t["name"]: f for t, f in zip(
             _remove_board_member, _list_tasks, _add_task, _claim_task,
             _update_task, _list_briefs, _get_brief, _set_brief,
             _session_pack, _get_policy, _set_policy, _agent_ready,
-            _agent_poll, _board_tick, _reassign_task, _whoami, _join_agent])}
+            _agent_poll, _board_tick, _reassign_task, _whoami, _join_agent,
+            _create_board, _mint_key])}
 
 
 def handle(brain, msg):

@@ -99,8 +99,13 @@ def _ensure(con):
         "id INTEGER PRIMARY KEY,"
         "chat TEXT NOT NULL UNIQUE,"
         "title TEXT NOT NULL DEFAULT '',"
+        "host_agent TEXT NOT NULL DEFAULT '',"
         "created_at REAL NOT NULL DEFAULT 0)"
     )
+    if "host_agent" not in _cols(con, "boards"):
+        con.execute(
+            "ALTER TABLE boards ADD COLUMN host_agent "
+            "TEXT NOT NULL DEFAULT ''")
     con.execute(
         "CREATE TABLE IF NOT EXISTS board_members ("
         "board_id INTEGER NOT NULL,"
@@ -164,6 +169,16 @@ def _ensure(con):
         con.commit()
 
     board = _get_or_create_board_raw(con, DEFAULT_CHAT, title="Peers")
+    # Migrate legacy global is_admin → peers board host (once).
+    if not (board.get("host_agent") or "").strip():
+        row = con.execute(
+            "SELECT name FROM agents WHERE is_admin=1 LIMIT 1").fetchone()
+        host = row["name"] if row else "cursor"
+        con.execute(
+            "UPDATE boards SET host_agent=? WHERE id=?", (host, board["id"]))
+        board["host_agent"] = host
+        con.commit()
+    _sync_is_admin(con)
     # Migrate legacy unscoped rows onto the default board.
     con.execute(
         "UPDATE tasks SET board_id=? WHERE board_id=0 OR board_id IS NULL",
@@ -227,7 +242,7 @@ def seed_if_needed(con):
 
 def _board_row(con, board_id):
     r = con.execute(
-        "SELECT id, chat, title, created_at FROM boards WHERE id=?",
+        "SELECT id, chat, title, host_agent, created_at FROM boards WHERE id=?",
         (board_id,)).fetchone()
     if not r:
         return None
@@ -237,28 +252,42 @@ def _board_row(con, board_id):
         "('open','claimed','blocked')", (r["id"],)).fetchone()[0]
     return {
         "id": r["id"], "chat": r["chat"], "title": r["title"] or r["chat"],
+        "host_agent": r["host_agent"] or "",
         "created_at": r["created_at"],
         "members": members, "open_tasks": open_n,
     }
 
 
-def _get_or_create_board_raw(con, chat, title=""):
+def _get_or_create_board_raw(con, chat, title="", host_agent=""):
     chat = _chat_slug(chat)
     row = con.execute(
-        "SELECT id, chat, title, created_at FROM boards WHERE chat=?",
+        "SELECT id, chat, title, host_agent, created_at FROM boards WHERE chat=?",
         (chat,)).fetchone()
     if row:
         return {"id": row["id"], "chat": row["chat"],
                 "title": row["title"] or row["chat"],
+                "host_agent": row["host_agent"] or "",
                 "created_at": row["created_at"]}
     now = time.time()
     title = (title or chat).strip()[:80]
+    host_agent = _slug(host_agent) if host_agent else ""
     cur = con.execute(
-        "INSERT INTO boards(chat, title, created_at) VALUES(?,?,?)",
-        (chat, title, now))
+        "INSERT INTO boards(chat, title, host_agent, created_at) "
+        "VALUES(?,?,?,?)",
+        (chat, title, host_agent, now))
     con.commit()
     return {"id": cur.lastrowid, "chat": chat, "title": title,
-            "created_at": now}
+            "host_agent": host_agent, "created_at": now}
+
+
+def _sync_is_admin(con):
+    """is_admin mirrors 'hosts at least one board' for UI/compat."""
+    con.execute("UPDATE agents SET is_admin=0")
+    con.execute(
+        "UPDATE agents SET is_admin=1 WHERE name IN "
+        "(SELECT DISTINCT host_agent FROM boards "
+        "WHERE host_agent IS NOT NULL AND host_agent != '')")
+    con.commit()
 
 
 def _ensure_member(con, board_id, agent, role="member"):
@@ -301,12 +330,72 @@ def get_board(con, chat=None, board_id=None):
 
 
 def get_or_create_board(con, chat, title=""):
+    """Shared/legacy open: seed default workers. Prefer create_hosted_board
+    for an agent's own board."""
     _ensure(con)
     raw = _get_or_create_board_raw(con, chat, title=title)
     # New boards get default agents so coordination can start immediately.
     for name, _, _ in DEFAULT_AGENTS:
         _ensure_member(con, raw["id"], name, role="worker")
     return _board_row(con, raw["id"])
+
+
+def create_hosted_board(con, chat, host_agent, title=""):
+    """Create a personal board. Caller becomes host (admin member).
+
+    Each agent may host at most one board. Does not seed DEFAULT_AGENTS —
+    host invites whom they want.
+    """
+    _ensure(con)
+    host_agent = _slug(host_agent)
+    chat = _chat_slug(chat)
+    if not con.execute(
+            "SELECT 1 FROM agents WHERE name=?", (host_agent,)).fetchone():
+        upsert_agent(con, host_agent)
+    existing = con.execute(
+        "SELECT chat FROM boards WHERE host_agent=?", (host_agent,)).fetchone()
+    if existing:
+        raise ValueError(
+            f"already host of '{existing['chat']}' — each agent hosts one board")
+    row = con.execute(
+        "SELECT id, host_agent FROM boards WHERE chat=?", (chat,)).fetchone()
+    if row:
+        raise ValueError(f"board '{chat}' already exists")
+    raw = _get_or_create_board_raw(
+        con, chat, title=title or chat, host_agent=host_agent)
+    _ensure_member(con, raw["id"], host_agent, role="admin")
+    _sync_is_admin(con)
+    return _board_row(con, raw["id"])
+
+
+def board_host(con, chat=None, board_id=None) -> str:
+    """Host agent name for a board, or ''."""
+    _ensure(con)
+    b = get_board(con, chat=chat, board_id=board_id)
+    return (b.get("host_agent") or "") if b else ""
+
+
+def hosted_board(con, agent):
+    """The one board this agent hosts, or None."""
+    _ensure(con)
+    agent = _slug(agent)
+    row = con.execute(
+        "SELECT id FROM boards WHERE host_agent=?", (agent,)).fetchone()
+    return _board_row(con, row["id"]) if row else None
+
+
+def can_manage_board(con, token: str, admin_token: str = "",
+                     chat=None, board_id=None) -> bool:
+    """Bootstrap admin, or the host agent's key for that board."""
+    if not token:
+        return False
+    if admin_token and secrets.compare_digest(token, admin_token):
+        return True
+    name = agent_token_ok(con, token)
+    if not name:
+        return False
+    host = board_host(con, chat=chat, board_id=board_id)
+    return bool(host) and name == host
 
 
 def list_members(con, board_id):
@@ -441,12 +530,14 @@ def whoami(con, token: str, admin_token: str = "") -> dict:
                 "member")
             boards.append({"chat": b["chat"], "role": role})
     agent = next(a for a in list_agents(con) if a["name"] == name)
-    host = bool(agent["is_admin"])
+    mine = hosted_board(con, name)
+    host = bool(mine)
     return {
-        "admin": host,
+        "admin": host,  # compat: host of any board
         "key_ok": True,
         "agent": name,
         "host": host,
+        "hosted_chat": mine["chat"] if mine else None,
         "label": agent["label"],
         "boards": boards,
         "has_key": True,
@@ -501,47 +592,58 @@ def upsert_agent(con, name, label=None, parallel_ok=None):
     return next(a for a in list_agents(con) if a["name"] == name)
 
 
-def set_host(con, name, on=True):
-    """Flag ONE agent as the board host (single-admin model).
+def set_host(con, name, on=True, chat=None):
+    """Set (or clear) the host of a board. Each agent hosts at most one.
 
-    The host agent's private key carries admin scope: it can mint keys,
-    onboard agents, and manage board membership — with posts still
-    attributed to it (unlike the bootstrap admin token). Setting a new
-    host clears any previous one. Admin-token-only endpoint calls this.
+    Bootstrap-admin endpoint. Host key can invite/mint on that board and
+    posts stay attributed to the host agent.
     """
     _ensure(con)
     name = _slug(name)
+    chat = _chat_slug(chat or DEFAULT_CHAT)
     if not con.execute("SELECT 1 FROM agents WHERE name=?", (name,)).fetchone():
         raise ValueError(f"unknown agent: {name}")
+    board = get_or_create_board(con, chat)
     if on:
-        con.execute("UPDATE agents SET is_admin=0 WHERE is_admin=1")
-    con.execute(
-        "UPDATE agents SET is_admin=? WHERE name=?",
-        (1 if on else 0, name))
+        other = con.execute(
+            "SELECT chat FROM boards WHERE host_agent=? AND id!=?",
+            (name, board["id"])).fetchone()
+        if other:
+            raise ValueError(
+                f"{name} already hosts '{other['chat']}' — each agent "
+                "hosts one board")
+        con.execute(
+            "UPDATE boards SET host_agent=? WHERE id=?", (name, board["id"]))
+        _ensure_member(con, board["id"], name, role="admin")
+    else:
+        if (board.get("host_agent") or "") == name:
+            con.execute(
+                "UPDATE boards SET host_agent='' WHERE id=?", (board["id"],))
     con.commit()
-    return {"agent": name, "host": bool(on)}
+    _sync_is_admin(con)
+    return {
+        "agent": name, "host": bool(on), "chat": chat,
+        "board": _board_row(con, board["id"]),
+    }
 
 
-def host_agent(con):
-    _ensure(con)
-    row = con.execute(
-        "SELECT name FROM agents WHERE is_admin=1 LIMIT 1").fetchone()
-    return row["name"] if row else None
+def host_agent(con, chat=None):
+    """Host of a board (default peers). Prefer board_host()."""
+    return board_host(con, chat=chat or DEFAULT_CHAT) or None
 
 
 def resolve_admin(con, token: str, admin_token: str = "") -> bool:
-    """True if a presented token carries admin scope.
+    """True if token is bootstrap admin OR hosts any board.
 
-    Bootstrap admin token OR the host agent's private key. The host key
-    resolution goes through agent_token_ok → identity, so a stale key
-    for a de-hosted agent loses admin immediately.
+    Prefer can_manage_board() for board-scoped actions. Self-mint does not
+    need this.
     """
     if not token:
         return False
     if admin_token and secrets.compare_digest(token, admin_token):
         return True
     name = agent_token_ok(con, token)
-    return bool(name) and name == host_agent(con)
+    return bool(name) and hosted_board(con, name) is not None
 
 
 def mint_agent_key(con, name):
@@ -557,6 +659,32 @@ def mint_agent_key(con, name):
     con.commit()
     return {"agent": name, "token": raw, "hint": raw[-4:],
             "message": "Copy now — shown once."}
+
+
+def mint_for_caller(con, token: str, name: str = "",
+                    admin_token: str = "", chat=None) -> dict:
+    """Self-mint always; mint-for-other if bootstrap or board host.
+
+    Connected agents remint their own key without asking the host. Hosts
+    remint invitees on boards they own. Lost keys (disconnected agents)
+    need a board host or bootstrap admin.
+    """
+    _ensure(con)
+    caller = agent_token_ok(con, token)
+    is_boot = bool(
+        admin_token and token
+        and secrets.compare_digest(token, admin_token))
+    target = _slug(name) if name else (caller or "")
+    if not target:
+        raise ValueError("agent name required")
+    if is_boot or (caller and caller == target):
+        return mint_agent_key(con, target)
+    if caller and can_manage_board(
+            con, token, admin_token, chat=chat or DEFAULT_CHAT):
+        return mint_agent_key(con, target)
+    raise PermissionError(
+        "forbidden — remint your own key, or ask the board host / admin "
+        "to mint for another agent")
 
 
 def agent_token_ok(con, token: str):
