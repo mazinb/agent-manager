@@ -104,11 +104,7 @@ body.inbox #inbox-app{display:flex}
 .day{text-align:center;font-size:11px;color:var(--faint);margin:14px 0 10px}
 .day span{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:3px 10px}
 
-/* Grok-style inter-agent status line — "Messaged ● peer" */
-.ping{align-self:center;font-size:12.5px;color:var(--faint);margin:10px 0 6px;
-  display:flex;align-items:center;gap:7px;letter-spacing:.01em}
-.ping .orb{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.ping b{color:var(--dim);font-weight:600}
+/* (removed: "Messaged ● peer" ping — duplicates the author label) */
 
 .msg{display:flex;flex-direction:column;margin:2px 0;max-width:78%}
 .msg.first{margin-top:10px}
@@ -118,10 +114,8 @@ body.inbox #inbox-app{display:flex}
 .msg.human .who{margin-right:4px}
 .bubble{padding:9px 12px;border-radius:4px;font-size:14.5px;line-height:1.5;
   word-break:break-word;white-space:pre-wrap}
-.msg.ai .bubble{background:var(--bubble-ai);border:1px solid var(--border);
-  border-left:2px solid var(--acc);border-top-left-radius:4px}
-.msg.human .bubble{background:var(--bubble-human);border:1px solid #2ea04344;
-  border-top-right-radius:4px}
+.msg.ai .bubble{background:var(--bubble-ai);border:1px solid var(--border)}
+.msg.human .bubble{background:var(--bubble-human);border:1px solid var(--border)}
 .bubble .b-title{font-weight:600;margin-bottom:2px}
 .meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;
   font-size:10.5px;color:var(--faint);margin:3px 4px 8px}
@@ -319,13 +313,6 @@ function initials(name){
   const s = (name||'?').replace(/[^a-z0-9]/gi,'').slice(0,2).toUpperCase();
   return s || '·';
 }
-function orbColor(name){
-  // Stable pastel for Messaged ● peer (Grok uses distinct agent orbs)
-  const palette = ['#f85149','#3fb950','#58a6ff','#d2a8ff','#f0883e','#39d0d6','#ff7b72','#a5d6ff'];
-  let h = 0;
-  for(const c of (name||'')) h = (h*31 + c.charCodeAt(0)) >>> 0;
-  return palette[h % palette.length];
-}
 function prettyAgent(slug){
   return (slug||'').replace(/-/g,' ');
 }
@@ -509,12 +496,6 @@ function renderChat(){
   NOTES.forEach(n => {
     const d = dayOf(n.verified_at || 0);
     if(d !== lastDay){ html += '<div class="day"><span>'+d+'</span></div>'; lastDay = d; lastWho = null; }
-    // Grok-style "Messaged ● peer" line when an agent messages another
-    if(n.to_agent){
-      const col = orbColor(n.to_agent);
-      html += '<div class="ping" style="--orb:'+col+'"><span class="orb" style="background:'+col+'"></span>Messaged <b>'+esc(prettyAgent(n.to_agent))+'</b></div>';
-      lastWho = null;
-    }
     const who = n.origin === 'human' ? 'You'
               : (n.agent ? prettyAgent(n.agent) : 'Brain');
     // author name once per run — repeating it between messages adds no value
