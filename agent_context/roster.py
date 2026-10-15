@@ -90,6 +90,10 @@ def _ensure(con):
         con.execute(
             "ALTER TABLE agents ADD COLUMN last_seen_at "
             "REAL NOT NULL DEFAULT 0")
+    if "is_admin" not in _cols(con, "agents"):
+        con.execute(
+            "ALTER TABLE agents ADD COLUMN is_admin "
+            "INTEGER NOT NULL DEFAULT 0")
     con.execute(
         "CREATE TABLE IF NOT EXISTS boards ("
         "id INTEGER PRIMARY KEY,"
@@ -377,12 +381,14 @@ def list_agents(con):
     _ensure(con)
     rows = con.execute(
         "SELECT name, label, token_hint, parallel_ok, created_at, last_seen_at,"
+        " is_admin,"
         " CASE WHEN token_hash != '' THEN 1 ELSE 0 END AS has_key "
         "FROM agents ORDER BY name").fetchall()
     return [{
         "name": r["name"], "label": r["label"] or r["name"],
         "has_key": bool(r["has_key"]), "token_hint": r["token_hint"] or "",
         "parallel_ok": bool(r["parallel_ok"]),
+        "is_admin": bool(r["is_admin"]),
         "created_at": r["created_at"],
         "last_seen_at": r["last_seen_at"] or 0,
     } for r in rows]
@@ -435,10 +441,12 @@ def whoami(con, token: str, admin_token: str = "") -> dict:
                 "member")
             boards.append({"chat": b["chat"], "role": role})
     agent = next(a for a in list_agents(con) if a["name"] == name)
+    host = bool(agent["is_admin"])
     return {
-        "admin": False,
+        "admin": host,
         "key_ok": True,
         "agent": name,
+        "host": host,
         "label": agent["label"],
         "boards": boards,
         "has_key": True,
@@ -491,6 +499,49 @@ def upsert_agent(con, name, label=None, parallel_ok=None):
              time.time()))
     con.commit()
     return next(a for a in list_agents(con) if a["name"] == name)
+
+
+def set_host(con, name, on=True):
+    """Flag ONE agent as the board host (single-admin model).
+
+    The host agent's private key carries admin scope: it can mint keys,
+    onboard agents, and manage board membership — with posts still
+    attributed to it (unlike the bootstrap admin token). Setting a new
+    host clears any previous one. Admin-token-only endpoint calls this.
+    """
+    _ensure(con)
+    name = _slug(name)
+    if not con.execute("SELECT 1 FROM agents WHERE name=?", (name,)).fetchone():
+        raise ValueError(f"unknown agent: {name}")
+    if on:
+        con.execute("UPDATE agents SET is_admin=0 WHERE is_admin=1")
+    con.execute(
+        "UPDATE agents SET is_admin=? WHERE name=?",
+        (1 if on else 0, name))
+    con.commit()
+    return {"agent": name, "host": bool(on)}
+
+
+def host_agent(con):
+    _ensure(con)
+    row = con.execute(
+        "SELECT name FROM agents WHERE is_admin=1 LIMIT 1").fetchone()
+    return row["name"] if row else None
+
+
+def resolve_admin(con, token: str, admin_token: str = "") -> bool:
+    """True if a presented token carries admin scope.
+
+    Bootstrap admin token OR the host agent's private key. The host key
+    resolution goes through agent_token_ok → identity, so a stale key
+    for a de-hosted agent loses admin immediately.
+    """
+    if not token:
+        return False
+    if admin_token and secrets.compare_digest(token, admin_token):
+        return True
+    name = agent_token_ok(con, token)
+    return bool(name) and name == host_agent(con)
 
 
 def mint_agent_key(con, name):

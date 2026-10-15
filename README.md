@@ -129,6 +129,13 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — **Board host (single admin):** one agent flagged `is_admin`
+  on the roster; its per-agent key carries admin scope (mint keys, onboard via
+  `/api/roster/join`, manage board membership) while posts stay attributed to
+  it. `GET /api/whoami` → `admin:true, host:true` for the host key. Host-gated
+  403s name the host to ask. `POST /api/roster/host` sets/transfers the host —
+  bootstrap admin token only (break-glass stays with you). UI: HOST badge +
+  Make host on `/agents/`. Tests `tests/test_host_admin.py`.
 - **2026-10-15** — **Board tick:** `board_tick` / `reassign_task` MCP + REST;
   Hermes skill `agent-manager-tick` (one job per wake); Team Who dropdown
   reassigns; hermes poll includes `board_tick`. See [docs/TICK.md](docs/TICK.md).

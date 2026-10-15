@@ -74,6 +74,9 @@ tr:last-child td{border-bottom:0}
 .dim-txt{color:var(--dim);font-size:12px}
 /* roles/modes are plain dim text — no pills */
 .role-txt,.mode-txt,.status-txt{color:var(--dim);font-size:12.5px}
+.host-tag{color:var(--acc);font-size:10.5px;font-weight:600;letter-spacing:.08em;
+  border:1px solid var(--acc);border-radius:3px;padding:1px 4px;margin-left:4px;
+  vertical-align:1px}
 .status-txt.open{color:var(--acc)}
 .status-txt.done{color:var(--ok)}
 .status-txt.blocked{color:var(--warn)}
@@ -335,7 +338,7 @@ function renderTeam(){
     const seen = fmtSeen(a.last_seen_at);
     const seenCls = a.last_seen_at ? 'dim-txt' : 'seen-never';
     return `<tr>
-      <td><span class="name">${esc(a.label)}</span>
+      <td><span class="name">${esc(a.label)}</span>${a.is_admin ? ' <span class="host-tag">HOST</span>' : ''}
         <div class="dim-txt" style="margin:0">${esc(n)}</div></td>
       <td><span class="role-txt">${esc(role || '—')}</span></td>
       <td><span class="${readyCls}">${esc(readyTxt)}</span></td>
@@ -347,6 +350,7 @@ function renderTeam(){
           <div class="menu-items">
             <button type="button" class="btn ghost" data-check="${esc(n)}">Check now</button>
             <button type="button" class="btn ghost" data-key="${esc(n)}">Mint key</button>
+            ${a.is_admin ? '' : '<button type="button" class="btn ghost" data-host="' + esc(n) + '">Make host</button>'}
             ${m
               ? `<button type="button" class="btn danger" data-rm="${esc(n)}">Remove from board</button>`
               : `<div class="m-add">
@@ -373,6 +377,17 @@ function renderTeam(){
   });
   $('team-rows').querySelectorAll('[data-key]').forEach(b => {
     b.onclick = () => { b.closest('details').open = false; mintKey(b.dataset.key); };
+  });
+  $('team-rows').querySelectorAll('[data-host]').forEach(b => {
+    b.onclick = async () => {
+      b.closest('details').open = false;
+      if(!confirm('Make '+b.dataset.host+' the board host? (current host loses admin)')) return;
+      try {
+        await api('/api/roster/host', {
+          method:'POST', body: JSON.stringify({agent: b.dataset.host})});
+        await refresh();
+      } catch(e){ alert(e.message); }
+    };
   });
   $('team-rows').querySelectorAll('[data-rm]').forEach(b => {
     b.onclick = async () => {

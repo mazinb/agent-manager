@@ -217,6 +217,15 @@ class Handler(BaseHTTPRequestHandler):
             pass
         return True
 
+    def _is_host(self):
+        """Admin scope: bootstrap admin token OR the host agent's key."""
+        return roster.resolve_admin(
+            BRAIN.con, presented_token(self), ADMIN_TOKEN or "")
+
+    def _is_bootstrap_admin(self):
+        tok = presented_token(self)
+        return bool(ADMIN_TOKEN) and secrets.compare_digest(tok, ADMIN_TOKEN)
+
     def _unauth(self):
         """Clearer 401 — name what's missing so agents aren't silent failures."""
         tok = presented_token(self)
@@ -618,17 +627,45 @@ class Handler(BaseHTTPRequestHandler):
             "/api/roster/briefs", "/api/roster/policies",
             "/api/roster/ready", "/api/roster/poll",
             "/api/roster/tick", "/api/roster/tasks/reassign",
-            "/api/roster/join",
+            "/api/roster/join", "/api/roster/host",
         ):
             return self._json(404, {"error": "not found"})
         if not self._authed():
             return self._unauth()
+
+        # Host-gated endpoints: only the bootstrap admin token or the host
+        # agent's key may mint keys, onboard agents, or manage membership.
+        if path in (
+            "/api/roster/agents", "/api/roster/agents/key",
+            "/api/roster/board/members", "/api/roster/board/members/remove",
+            "/api/roster/join",
+        ) and not self._is_host():
+            return self._json(403, {
+                "error": "forbidden",
+                "hint": "admin scope needed — this endpoint is limited to "
+                        "the host agent's key or the bootstrap admin token. "
+                        "Ask the board host (see /api/roster/agents "
+                        "is_admin=true).",
+            })
 
         try:
             payload = self._read_json()
         except Exception:
             return self._json(400, {"error": "bad json"})
 
+        if path == "/api/roster/host":
+            # Bootstrap-only: transferring host is admin-token business.
+            if not self._is_bootstrap_admin():
+                return self._json(403, {
+                    "error": "forbidden",
+                    "hint": "setting the host agent requires the bootstrap "
+                            "admin token"})
+            try:
+                return self._json(200, roster.set_host(
+                    BRAIN.con, payload.get("agent") or "",
+                    on=False if payload.get("on") is False else True))
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
         if path == "/api/roster/agents":
             try:
                 return self._json(200, roster.upsert_agent(
