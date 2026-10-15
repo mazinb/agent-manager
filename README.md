@@ -90,6 +90,12 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — **Fluid agent briefs** replace the rigid Rules UI:
+  one markdown brief per board member (`list_briefs` / `set_brief` /
+  `session_pack`), 4KB/brief + 12KB pack caps, hash skip for re-ingest.
+  Optional `routes:` frontmatter drives auto-assign. **Peer messaging
+  fix:** `message_peer` is append-only (same title to two agents no
+  longer clobbers). Docs: `docs/AGENTS-BOARD.md`, `docs/PEER-INBOX.md`.
 - **2026-10-15** — Task boards **linked to inbox chats**: each board has
   members (access); claim/assign requires membership. Agents UI picks a
   chat; Inbox shows a board strip. MCP `list_boards` / `get_board` /

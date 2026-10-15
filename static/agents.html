@@ -96,15 +96,14 @@ tr:last-child td{border-bottom:0}
 .reveal{background:var(--panel);border:1px solid var(--warn);border-radius:4px;padding:12px;margin-top:10px}
 .reveal .tok{font:13px/1.4 ui-monospace,Menlo,monospace;word-break:break-all;margin:0 0 8px}
 
-/* rules: one row per rule */
-.rule{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-.rule .r-text{color:var(--dim);font-size:12.5px;white-space:nowrap}
-.rule .r-arrow{color:var(--faint)}
-.rule .r-match{flex:1;min-width:140px;width:auto}
-.rule .r-agent{width:auto;min-width:130px;flex:0 0 auto}
-.rule .r-en{display:flex;align-items:center;gap:5px;color:var(--dim);font-size:12px;white-space:nowrap}
-.rule .r-en input{width:15px;height:15px;padding:0;accent-color:var(--acc)}
-.rule .r-del{flex:0 0 auto}
+/* briefs: per-agent markdown, char meter */
+.brief{border-top:1px solid var(--line);padding:12px 0}
+.brief:first-child{border-top:0;padding-top:0}
+.brief .b-head{display:flex;gap:10px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap}
+.brief .b-agent{font:600 13px/1.2 ui-monospace,Menlo,monospace}
+.brief .b-meta{color:var(--dim);font-size:12px}
+.brief .b-routes{color:var(--faint);font-size:12px}
+.brief textarea{width:100%;min-height:110px;font:12.5px/1.45 ui-monospace,Menlo,monospace;resize:vertical}
 
 @media (max-width:640px){
   .top{padding:0 10px}
@@ -205,12 +204,11 @@ tr:last-child td{border-bottom:0}
     </section>
 
     <section class="sec">
-      <h2>Rules</h2>
-      <p class="hint" style="margin:0 0 10px">First match wins.</p>
-      <div id="rules"></div>
+      <h2>Briefs</h2>
+      <p class="hint" style="margin:0 0 10px">One markdown file per member — ingested at chat start. Cap 4KB each / 12KB pack. Optional frontmatter: <code>routes: on-device=serial, code=parallel</code></p>
+      <div id="briefs"></div>
       <div class="actions">
-        <button type="button" class="btn ghost" id="btn-add-rule">Add rule</button>
-        <button type="button" class="btn primary" id="btn-save-rules">Save</button>
+        <button type="button" class="btn primary" id="btn-save-briefs">Save briefs</button>
       </div>
     </section>
   </div>
@@ -219,7 +217,7 @@ tr:last-child td{border-bottom:0}
 const $ = id => document.getElementById(id);
 const KEY = 'am_token';
 let TOK = localStorage.getItem(KEY) || '';
-let AGENTS = [], TASKS = [], RULES = [], BOARDS = [], BOARD = null;
+let AGENTS = [], TASKS = [], BRIEFS = [], BOARDS = [], BOARD = null;
 const params = new URLSearchParams(location.search);
 let CHAT = params.get('chat') || 'peers';
 
@@ -266,16 +264,16 @@ async function refresh(){
   BOARD = board;
   CHAT = board.chat || CHAT;
   const q = 'chat=' + encodeURIComponent(CHAT);
-  const [t, r] = await Promise.all([
+  const [t, b] = await Promise.all([
     api('/api/roster/tasks?' + q),
-    api('/api/roster/rules?' + q),
+    api('/api/roster/briefs?' + q),
   ]);
   TASKS = t.tasks || [];
-  RULES = r.rules || [];
+  BRIEFS = b.briefs || [];
   renderBoards();
   renderTeam();
   renderTasks();
-  renderRules();
+  renderBriefs();
   const members = BOARD.members || [];
   const sel = $('task-assignee');
   const cur = sel.value;
@@ -404,26 +402,29 @@ function renderTasks(){
   });
 }
 
-function renderRules(){
+function renderBriefs(){
   const members = (BOARD && BOARD.members) || [];
-  const opts = members.length ? members : AGENTS.map(a => ({agent:a.name, label:a.label}));
-  $('rules').innerHTML = RULES.map((r,i) =>
-    `<div class="rule" data-i="${i}">
-      <span class="r-text">if text contains</span>
-      <input class="r-match" value="${esc(r.match)}" placeholder="text">
-      <span class="r-arrow">&rarr;</span>
-      <select class="r-agent">${opts.map(a =>
-        `<option value="${a.agent || a.name}" ${(a.agent||a.name)===r.agent?'selected':''}>${esc(a.label)}</option>`).join('')}</select>
-      <label class="r-en"><input type="checkbox" class="r-en-box" ${r.enabled !== false ? 'checked' : ''}> enabled</label>
-      <button type="button" class="btn ghost icon-btn r-del" aria-label="Delete rule">&times;</button>
-    </div>`
-  ).join('') || '<p class="hint">No rules.</p>';
-  $('rules').querySelectorAll('.r-del').forEach(b => {
-    b.onclick = () => {
-      const i = +b.closest('.rule').dataset.i;
-      RULES.splice(i, 1);
-      renderRules();
-    };
+  const by = Object.fromEntries(BRIEFS.map(b => [b.agent, b]));
+  // Show every member — empty body if no brief yet.
+  const rows = members.length ? members : AGENTS.map(a => ({agent:a.name, label:a.label}));
+  $('briefs').innerHTML = rows.map(m => {
+    const agent = m.agent || m.name;
+    const b = by[agent] || {body:'', chars:0, max_chars:4000, routes:[]};
+    const routes = (b.routes || []).map(r =>
+      `${r.match}${r.parallel ? '=parallel' : '=serial'}`).join(', ') || '—';
+    return `<div class="brief" data-agent="${esc(agent)}">
+      <div class="b-head">
+        <span class="b-agent">${esc(m.label || agent)}</span>
+        <span class="b-meta"><span class="b-chars">${b.chars || 0}</span>/${b.max_chars || 4000}</span>
+        <span class="b-routes">routes ${esc(routes)}</span>
+      </div>
+      <textarea class="b-body" spellcheck="false" placeholder="---&#10;routes: keyword=serial&#10;---&#10;&#10;# ${esc(agent)}&#10;&#10;What this agent does on this chat…">${esc(b.body || '')}</textarea>
+    </div>`;
+  }).join('') || '<p class="hint">Add board members to write briefs.</p>';
+  $('briefs').querySelectorAll('.brief').forEach(el => {
+    const ta = el.querySelector('.b-body');
+    const meter = el.querySelector('.b-chars');
+    ta.oninput = () => { meter.textContent = ta.value.length; };
   });
 }
 
@@ -487,21 +488,16 @@ $('btn-add-task').onclick = async () => {
   } catch(e){ alert(e.message); }
 };
 
-$('btn-add-rule').onclick = () => {
-  const members = (BOARD && BOARD.members) || [];
-  RULES.push({match:'', agent: members[0]?.agent || AGENTS[0]?.name || 'hermes',
-              parallel:false, enabled:true, priority:0});
-  renderRules();
-};
-$('btn-save-rules').onclick = async () => {
-  const rules = [...$('rules').querySelectorAll('.rule')].map((el, i) => ({
-    match: el.querySelector('.r-match').value.trim(),
-    agent: el.querySelector('.r-agent').value,
-    parallel: !!(RULES[i] && RULES[i].parallel),
-    priority: RULES[i] ? RULES[i].priority : undefined,
-    enabled: el.querySelector('.r-en-box').checked,
-  })).filter(r => r.match);
-  await api('/api/roster/rules', {method:'POST', body: JSON.stringify({rules, chat: CHAT})});
+$('btn-save-briefs').onclick = async () => {
+  const rows = [...$('briefs').querySelectorAll('.brief')];
+  for (const el of rows) {
+    const agent = el.dataset.agent;
+    const body = el.querySelector('.b-body').value;
+    await api('/api/roster/briefs', {
+      method: 'POST',
+      body: JSON.stringify({agent, body, chat: CHAT}),
+    });
+  }
   await refresh();
 };
 

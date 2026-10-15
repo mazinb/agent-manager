@@ -209,6 +209,24 @@ class PeerInbox(unittest.TestCase):
         with self.assertRaises(ValueError):
             mcp._message_peer(_Brain(con), {"agent": "x", "body": "hi"})
 
+    def test_message_peer_same_title_does_not_clobber(self):
+        """Two peer pings with the same title must both survive (append-only)."""
+        con = fresh_con()
+        mcp._message_peer(_Brain(con), {
+            "agent": "cursor", "to_agent": "hermes",
+            "title": "plan-fluid", "body": "for hermes"})
+        mcp._message_peer(_Brain(con), {
+            "agent": "cursor", "to_agent": "grok-bot",
+            "title": "plan-fluid", "body": "for grok"})
+        hermes = mcp._peer_inbox(_Brain(con), {"to_agent": "hermes"})
+        grok = mcp._peer_inbox(_Brain(con), {"to_agent": "grok-bot"})
+        self.assertEqual(len(hermes["messages"]), 1)
+        self.assertEqual(hermes["messages"][0]["body"], "for hermes")
+        self.assertEqual(hermes["messages"][0]["title"], "plan-fluid")
+        self.assertEqual(len(grok["messages"]), 1)
+        self.assertEqual(grok["messages"][0]["body"], "for grok")
+        self.assertEqual(grok["messages"][0]["to_agent"], "grok-bot")
+
 
 class GithubSignIn(unittest.TestCase):
     def test_scope_is_read_only_minimal(self):

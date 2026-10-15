@@ -400,6 +400,30 @@ class Handler(BaseHTTPRequestHandler):
                     board_id=int(board_id) if board_id else None)})
             except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
+        if path == "/api/roster/briefs":
+            board_id = (q.get("board_id") or [None])[0]
+            agent = (q.get("agent") or [None])[0]
+            try:
+                if agent:
+                    return self._json(200, roster.get_brief(
+                        BRAIN.con, agent,
+                        chat=(q.get("chat") or [None])[0],
+                        board_id=int(board_id) if board_id else None))
+                return self._json(200, {"briefs": roster.list_briefs(
+                    BRAIN.con,
+                    chat=(q.get("chat") or [None])[0],
+                    board_id=int(board_id) if board_id else None)})
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/session-pack":
+            board_id = (q.get("board_id") or [None])[0]
+            try:
+                return self._json(200, roster.session_pack(
+                    BRAIN.con,
+                    chat=(q.get("chat") or [None])[0],
+                    board_id=int(board_id) if board_id else None))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
         if path == "/api/inbox/messages":
             to_agent = (q.get("to") or q.get("to_agent") or [None])[0]
             agent = (q.get("from") or q.get("agent") or [None])[0]
@@ -518,6 +542,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/roster/board/members/remove",
             "/api/roster/tasks", "/api/roster/tasks/claim",
             "/api/roster/tasks/update", "/api/roster/rules",
+            "/api/roster/briefs",
         ):
             return self._json(404, {"error": "not found"})
         if not self._authed():
@@ -612,6 +637,17 @@ class Handler(BaseHTTPRequestHandler):
                         BRAIN.con, payload.get("rules") or [],
                         chat=payload.get("chat"),
                         board_id=int(bid) if bid not in (None, "") else None)})
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/briefs":
+            try:
+                bid = payload.get("board_id")
+                return self._json(200, roster.set_brief(
+                    BRAIN.con,
+                    payload.get("agent") or "",
+                    payload.get("body") or "",
+                    chat=payload.get("chat"),
+                    board_id=int(bid) if bid not in (None, "") else None))
             except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
 

@@ -21,6 +21,38 @@ DEFAULT_CHAT = "peers"
 STATUSES = ("open", "claimed", "done", "blocked")
 MEMBER_ROLES = ("member", "worker", "admin")
 
+# Soft caps so session packs stay injectable without bloating context.
+MAX_BRIEF_CHARS = 4000
+MAX_SESSION_PACK_CHARS = 12000
+
+DEFAULT_BRIEFS = {
+    "hermes": (
+        "---\n"
+        "routes: on-device=serial, deploy=serial\n"
+        "---\n\n"
+        "# Hermes\n\n"
+        "On-device worker. Cursor plans and supervises; you execute one job "
+        "at a time, then reply on peers with `role: done|status|block`.\n"
+        "Keep bodies short. No secrets. Prefer peer inbox over A2A.\n"
+    ),
+    "cursor": (
+        "---\n"
+        "routes: code=parallel, plan=parallel\n"
+        "---\n\n"
+        "# Cursor\n\n"
+        "Planner / supervisor. Hand off on-device work to Hermes; ask "
+        "grok-bot for design review. Write short `role: plan|handoff` notes.\n"
+    ),
+    "grok-bot": (
+        "---\n"
+        "routes: review=parallel, design=parallel\n"
+        "---\n\n"
+        "# Grok Bot\n\n"
+        "Design and review peer. Punch lists over essays. Reply on peers; "
+        "do not dump long threads into briefs.\n"
+    ),
+}
+
 
 def _cols(con, table):
     return {r[1] for r in con.execute(f"PRAGMA table_info({table})")}
@@ -85,6 +117,15 @@ def _ensure(con):
         con.execute(
             "ALTER TABLE task_rules ADD COLUMN enabled "
             "INTEGER NOT NULL DEFAULT 1")
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS agent_briefs ("
+        "board_id INTEGER NOT NULL,"
+        "agent TEXT NOT NULL,"
+        "body TEXT NOT NULL DEFAULT '',"
+        "content_hash TEXT NOT NULL DEFAULT '',"
+        "updated_at REAL NOT NULL DEFAULT 0,"
+        "PRIMARY KEY (board_id, agent))"
+    )
     con.commit()
 
     n = con.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
@@ -121,6 +162,12 @@ def _ensure(con):
 
     for name, _, _ in DEFAULT_AGENTS:
         _ensure_member(con, board["id"], name, role="worker")
+        if name in DEFAULT_BRIEFS:
+            row = con.execute(
+                "SELECT 1 FROM agent_briefs WHERE board_id=? AND agent=?",
+                (board["id"], name)).fetchone()
+            if not row:
+                _write_brief_raw(con, board["id"], name, DEFAULT_BRIEFS[name])
 
 
 def _slug(name: str) -> str:
@@ -391,12 +438,196 @@ def set_rules(con, rules, board_id=None, chat=None):
 
 def _apply_rule(con, board_id, title, body):
     text = f"{title}\n{body}".lower()
+    # Prefer routes declared in member briefs (fluid markdown rules).
+    for brief in list_briefs(con, board_id=board_id):
+        for route in brief.get("routes") or []:
+            match = (route.get("match") or "").lower()
+            if match and match in text:
+                return brief["agent"], bool(route.get("parallel"))
+    # Legacy substring table (kept for API compat / older boards).
     for rule in list_rules(con, board_id=board_id):
         if not rule.get("enabled", True):
             continue
         if rule["match"].lower() in text:
             return rule["agent"], rule["parallel"]
     return "", None
+
+
+def _write_brief_raw(con, board_id, agent, body):
+    agent = _slug(agent)
+    body = (body or "")[:MAX_BRIEF_CHARS]
+    digest = hashlib.sha256(body.encode()).hexdigest()
+    now = time.time()
+    con.execute(
+        "INSERT INTO agent_briefs(board_id, agent, body, content_hash, updated_at) "
+        "VALUES(?,?,?,?,?) "
+        "ON CONFLICT(board_id, agent) DO UPDATE SET "
+        "body=excluded.body, content_hash=excluded.content_hash, "
+        "updated_at=excluded.updated_at",
+        (board_id, agent, body, digest, now))
+    con.commit()
+    return digest
+
+
+def parse_brief_frontmatter(body: str):
+    """Parse optional --- frontmatter. Returns (meta_dict, prose).
+
+    Supported keys (line-oriented, no YAML dependency):
+      routes: on-device=serial, deploy=serial, code=parallel
+      max_chars: 4000
+    """
+    body = body or ""
+    if not body.startswith("---"):
+        return {}, body
+    nl = body.find("\n", 3)
+    if nl < 0:
+        return {}, body
+    end = body.find("\n---", nl)
+    if end < 0:
+        return {}, body
+    fm_text = body[nl + 1:end].strip()
+    prose = body[end + 4:].lstrip("\n")
+    meta = {}
+    for line in fm_text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, _, val = line.partition(":")
+        meta[key.strip().lower()] = val.strip()
+    routes = []
+    for part in (meta.get("routes") or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "=" in part:
+            match, _, mode = part.partition("=")
+            routes.append({
+                "match": match.strip()[:80],
+                "parallel": mode.strip().lower() == "parallel",
+            })
+        else:
+            routes.append({"match": part[:80], "parallel": False})
+    meta["routes"] = routes
+    return meta, prose
+
+
+def list_briefs(con, board_id=None, chat=None):
+    """Member briefs for a board. Non-members omitted. Bodies capped."""
+    _ensure(con)
+    bid = _resolve_board_id(con, board_id=board_id, chat=chat)
+    members = {m["agent"] for m in list_members(con, bid)}
+    rows = con.execute(
+        "SELECT agent, body, content_hash, updated_at FROM agent_briefs "
+        "WHERE board_id=? ORDER BY agent", (bid,)).fetchall()
+    out = []
+    for r in rows:
+        if r["agent"] not in members:
+            continue
+        body = r["body"] or ""
+        truncated = len(body) > MAX_BRIEF_CHARS
+        if truncated:
+            body = body[:MAX_BRIEF_CHARS] + "\n…[truncated]"
+        meta, prose = parse_brief_frontmatter(body)
+        out.append({
+            "agent": r["agent"],
+            "body": body,
+            "prose": prose,
+            "routes": meta.get("routes") or [],
+            "content_hash": r["content_hash"],
+            "updated_at": r["updated_at"],
+            "chars": len(body),
+            "max_chars": MAX_BRIEF_CHARS,
+            "truncated": truncated,
+        })
+    return out
+
+
+def get_brief(con, agent, board_id=None, chat=None):
+    _ensure(con)
+    bid = _resolve_board_id(con, board_id=board_id, chat=chat)
+    agent = _slug(agent)
+    if not is_member(con, bid, agent):
+        raise ValueError(f"{agent} is not on this board")
+    row = con.execute(
+        "SELECT agent, body, content_hash, updated_at FROM agent_briefs "
+        "WHERE board_id=? AND agent=?", (bid, agent)).fetchone()
+    if not row:
+        return {
+            "agent": agent, "body": "", "prose": "", "routes": [],
+            "content_hash": "", "updated_at": 0, "chars": 0,
+            "max_chars": MAX_BRIEF_CHARS, "truncated": False,
+        }
+    body = row["body"] or ""
+    truncated = len(body) > MAX_BRIEF_CHARS
+    if truncated:
+        body = body[:MAX_BRIEF_CHARS] + "\n…[truncated]"
+    meta, prose = parse_brief_frontmatter(body)
+    return {
+        "agent": agent, "body": body, "prose": prose,
+        "routes": meta.get("routes") or [],
+        "content_hash": row["content_hash"],
+        "updated_at": row["updated_at"],
+        "chars": len(body), "max_chars": MAX_BRIEF_CHARS,
+        "truncated": truncated,
+    }
+
+
+def set_brief(con, agent, body, board_id=None, chat=None):
+    """Upsert one agent's markdown brief. Enforces membership + size cap."""
+    _ensure(con)
+    bid = _resolve_board_id(con, board_id=board_id, chat=chat)
+    agent = _slug(agent)
+    if not is_member(con, bid, agent):
+        raise ValueError(f"{agent} is not on this board")
+    raw = body if isinstance(body, str) else ""
+    if len(raw) > MAX_BRIEF_CHARS:
+        raw = raw[:MAX_BRIEF_CHARS]
+    digest = _write_brief_raw(con, bid, agent, raw)
+    return get_brief(con, agent, board_id=bid)
+
+
+def session_pack(con, board_id=None, chat=None, since_hashes=None):
+    """Markdown pack of member briefs for chat/session start.
+
+    Pass since_hashes={agent: hash} to skip unchanged briefs (anti-bloat).
+    Combined pack hard-capped at MAX_SESSION_PACK_CHARS.
+    """
+    _ensure(con)
+    bid = _resolve_board_id(con, board_id=board_id, chat=chat)
+    board = _board_row(con, bid)
+    since = since_hashes if isinstance(since_hashes, dict) else {}
+    briefs = list_briefs(con, board_id=bid)
+    included, skipped = [], []
+    parts = [f"# Session briefs — {board['chat']}\n"]
+    used = len(parts[0])
+    for i, b in enumerate(briefs):
+        if since.get(b["agent"]) and since[b["agent"]] == b["content_hash"]:
+            skipped.append(b["agent"])
+            continue
+        block = f"\n## {b['agent']} ({b['chars']}/{b['max_chars']})\n\n{b['body']}\n"
+        if used + len(block) > MAX_SESSION_PACK_CHARS:
+            parts.append(
+                f"\n…[pack truncated — skipped {b['agent']} and later]\n")
+            for rest in briefs[i:]:
+                if rest["agent"] not in skipped:
+                    skipped.append(rest["agent"])
+            break
+        parts.append(block)
+        included.append({
+            "agent": b["agent"], "content_hash": b["content_hash"],
+            "chars": b["chars"],
+        })
+        used += len(block)
+    text = "".join(parts)
+    return {
+        "chat": board["chat"],
+        "pack": text,
+        "chars": len(text),
+        "max_chars": MAX_SESSION_PACK_CHARS,
+        "included": included,
+        "skipped": skipped,
+        "hashes": {b["agent"]: b["content_hash"] for b in briefs},
+    }
 
 
 def list_tasks(con, status=None, assignee=None, limit=100,

@@ -162,7 +162,15 @@ def _message_peer(brain, args):
     """Grok-style peer ping: write a note with agent → to_agent on the bus.
 
     Default project is `peers` (shared inbox thread). Visible as
-    Messaged ● peer in /setup/. Prefer this over A2A for coordination."""
+    Messaged ● peer in /setup/. Prefer this over A2A for coordination.
+
+    Peer messages are append-only: path is note:<project>/peer/<nonce>/<title>
+    so two sends with the same title never clobber each other (unlike note())."""
+    import secrets
+    import time as _time
+    from . import store
+    from .ingest import _chunk_markdown
+
     agent = (args.get("agent") or "").strip()
     to_agent = (args.get("to_agent") or "").strip()
     body = (args.get("body") or args.get("message") or "").strip()
@@ -172,19 +180,29 @@ def _message_peer(brain, args):
         raise ValueError("to_agent is required (peer name, e.g. cursor)")
     if not body:
         raise ValueError("body is required")
-    title = (args.get("title") or "").strip()
+    project = re.sub(r"[^a-z0-9._-]", "-",
+                     (args.get("project") or "peers").lower()).strip("-")[:64] or "peers"
+    title = (args.get("title") or "").strip()[:200]
     if not title:
-        title = f"to-{to_agent}-{int(__import__('time').time())}"
-    return _note(brain, {
-        "project": (args.get("project") or "peers").strip() or "peers",
-        "title": title[:200],
-        "body": body,
-        "origin": "ai",
-        "agent": agent,
-        "to_agent": to_agent,
-        "confidence": args.get("confidence"),
-        "sources": args.get("sources"),
-    })
+        title = f"to-{store._slug_agent(to_agent)}-{int(_time.time())}"
+    # Sanitize title for path segment (no slashes); display title stays clean.
+    safe = re.sub(r"[/\\]+", "-", title).strip("-")[:160] or "msg"
+    nonce = f"{int(_time.time())}-{secrets.token_hex(3)}"
+    path = f"note:{project}/peer/{nonce}/{safe}"
+    sid = store.upsert_source(
+        brain.con, path, "note", project,
+        _time.time(), len(body), _chunk_markdown(f"# {safe}\n\n{body}"))
+    store.set_note_meta(
+        brain.con, sid, confidence=args.get("confidence"),
+        based_on=args.get("sources") if isinstance(args.get("sources"), list) else None,
+        origin="ai", agent=agent, to_agent=to_agent)
+    brain.con.commit()
+    return {
+        "ok": True, "project": project, "title": safe,
+        "agent": store._slug_agent(agent),
+        "to_agent": store._slug_agent(to_agent),
+        "id": sid,
+    }
 
 
 def _peer_inbox(brain, args):
@@ -367,6 +385,28 @@ TOOLS = [
          "id": {"type": "integer"}, "status": {"type": "string"},
          "assignee": {"type": "string"}, "parallel": {"type": "boolean"}},
          "required": ["id"]}},
+    {"name": "list_briefs", "description": "Per-agent markdown briefs for a "
+     "chat board (fluid rules). Members only; each capped at 4KB.",
+     "inputSchema": {"type": "object", "properties": {
+         "chat": {"type": "string"}, "board_id": {"type": "integer"}}}},
+    {"name": "get_brief", "description": "One agent's markdown brief.",
+     "inputSchema": {"type": "object", "properties": {
+         "agent": {"type": "string"}, "chat": {"type": "string"},
+         "board_id": {"type": "integer"}},
+         "required": ["agent"]}},
+    {"name": "set_brief", "description": "Write/replace an agent's markdown "
+     "brief (max 4KB). Optional frontmatter: routes: on-device=serial, code=parallel",
+     "inputSchema": {"type": "object", "properties": {
+         "agent": {"type": "string"}, "body": {"type": "string"},
+         "chat": {"type": "string"}, "board_id": {"type": "integer"}},
+         "required": ["agent", "body"]}},
+    {"name": "session_pack", "description": "Ingest member briefs at chat/"
+     "session start. Pass since_hashes to skip unchanged briefs (anti-bloat). "
+     "Pack hard-capped at 12KB.",
+     "inputSchema": {"type": "object", "properties": {
+         "chat": {"type": "string"}, "board_id": {"type": "integer"},
+         "since_hashes": {"type": "object",
+                          "description": "{agent: content_hash} from last pack"}}}},
 ]
 
 
@@ -447,6 +487,41 @@ def _update_task(brain, args):
         parallel=args.get("parallel"))
 
 
+def _list_briefs(brain, args):
+    from . import roster
+    bid = args.get("board_id")
+    return {"briefs": roster.list_briefs(
+        brain.con, chat=args.get("chat"),
+        board_id=int(bid) if bid not in (None, "") else None)}
+
+
+def _get_brief(brain, args):
+    from . import roster
+    bid = args.get("board_id")
+    return roster.get_brief(
+        brain.con, args.get("agent") or "",
+        chat=args.get("chat"),
+        board_id=int(bid) if bid not in (None, "") else None)
+
+
+def _set_brief(brain, args):
+    from . import roster
+    bid = args.get("board_id")
+    return roster.set_brief(
+        brain.con, args.get("agent") or "", args.get("body") or "",
+        chat=args.get("chat"),
+        board_id=int(bid) if bid not in (None, "") else None)
+
+
+def _session_pack(brain, args):
+    from . import roster
+    bid = args.get("board_id")
+    return roster.session_pack(
+        brain.con, chat=args.get("chat"),
+        board_id=int(bid) if bid not in (None, "") else None,
+        since_hashes=args.get("since_hashes"))
+
+
 TOOL_FUNCS = {t["name"]: f for t, f in zip(
     TOOLS, [_search, _ask, _entity, _context_pack, _projects, _stats, _note,
             _add_note, _list_projects, _get_project_summary,
@@ -454,7 +529,8 @@ TOOL_FUNCS = {t["name"]: f for t, f in zip(
             _set_autonote_config, _message_peer, _peer_inbox,
             _list_roster, _list_boards, _get_board, _add_board_member,
             _remove_board_member, _list_tasks, _add_task, _claim_task,
-            _update_task])}
+            _update_task, _list_briefs, _get_brief, _set_brief,
+            _session_pack])}
 
 
 def handle(brain, msg):

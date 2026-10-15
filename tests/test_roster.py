@@ -107,6 +107,47 @@ class RosterTasks(unittest.TestCase):
         self.assertEqual(t["assignee"], "grok-bot")
         self.assertTrue(t["parallel"])
 
+    def test_default_briefs_seeded(self):
+        con = fresh()
+        briefs = {b["agent"]: b for b in roster.list_briefs(con, chat="peers")}
+        self.assertIn("hermes", briefs)
+        self.assertIn("cursor", briefs)
+        self.assertIn("grok-bot", briefs)
+        self.assertTrue(briefs["hermes"]["body"])
+        self.assertLessEqual(briefs["hermes"]["chars"], roster.MAX_BRIEF_CHARS)
+
+    def test_brief_routes_auto_assign(self):
+        con = fresh()
+        roster.set_brief(con, "hermes",
+                         "---\nroutes: thermal=serial\n---\n\n# Hermes\ncool GPUs\n",
+                         chat="peers")
+        t = roster.add_task(con, "thermal guard tighten", created_by="cursor")
+        self.assertEqual(t["assignee"], "hermes")
+        self.assertFalse(t["parallel"])
+
+    def test_brief_size_cap(self):
+        con = fresh()
+        huge = "x" * (roster.MAX_BRIEF_CHARS + 500)
+        out = roster.set_brief(con, "cursor", huge, chat="peers")
+        self.assertLessEqual(out["chars"], roster.MAX_BRIEF_CHARS)
+        self.assertEqual(len(out["body"]), roster.MAX_BRIEF_CHARS)
+
+    def test_session_pack_skips_unchanged(self):
+        con = fresh()
+        first = roster.session_pack(con, chat="peers")
+        self.assertGreater(first["chars"], 0)
+        self.assertTrue(first["included"])
+        second = roster.session_pack(
+            con, chat="peers", since_hashes=first["hashes"])
+        self.assertEqual(second["included"], [])
+        self.assertGreaterEqual(len(second["skipped"]), 3)
+
+    def test_brief_non_member_rejected(self):
+        con = fresh()
+        roster.upsert_agent(con, "outsider")
+        with self.assertRaises(ValueError):
+            roster.set_brief(con, "outsider", "# nope", chat="peers")
+
 
 if __name__ == "__main__":
     unittest.main()

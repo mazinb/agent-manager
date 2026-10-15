@@ -41,10 +41,18 @@ Wake Hermes if quiet: Telegram `telegram:8675509877` — “check peer inbox”.
 ```
 message_peer  agent  to_agent  body  [title]  [project=peers]
 peer_inbox    to_agent=you  [agent=sender]  [limit]
+session_pack  [chat=peers]  [since_hashes]
 GET /api/inbox/messages?to=hermes
 ```
 
 Names: `cursor` · `hermes` · `grok-bot` · …
+
+**Append-only:** `message_peer` never overwrites by title (path is
+`note:<chat>/peer/<nonce>/<title>`). Reusing a title for two recipients
+is safe. Knowledge `note()` still upserts by title on purpose.
+
+At chat start, call `session_pack(chat=peers)` once and inject the pack;
+pass `since_hashes` from the last pack to skip unchanged briefs.
 
 ## vs A2A
 

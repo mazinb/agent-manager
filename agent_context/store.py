@@ -330,6 +330,11 @@ def list_notes(con, project=None):
     for r in con.execute(sql, args):
         _, _, rest = r["path"].partition(":")
         _, _, title = rest.partition("/")
+        # Append-only peer paths: note:<proj>/peer/<nonce>/<title>
+        if title.startswith("peer/"):
+            parts = title.split("/", 2)
+            if len(parts) >= 3:
+                title = parts[2]
         chunks = con.execute(
             "SELECT text FROM chunks WHERE source_id=? ORDER BY ord",
             (r["id"],)).fetchall()
