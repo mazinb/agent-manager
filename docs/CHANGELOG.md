@@ -2,6 +2,13 @@
 
 Moved from the root README so agent instructions stay crisp.
 
+- **2026-10-15** — **Inbox polish (utility-first):** thread list hides empty
+  projects (only real conversations, newest activity first); chat groups
+  consecutive messages per author — name shown once per run, no repeats
+  between bubbles; meta noise dropped (AI/Human/conf/from badges removed,
+  STALE kept). Brain page: native `prompt('Token:')` replaced by an in-page
+  token gate with an Inbox link — fixes the odd mobile dialog on
+  bot.getzoro.com. Screenshots sent to designer for review.
 - **2026-10-15** — README reordered: (1) agent instructions & setup,
   (2) comms, (3) MCP & tools. Long history lives here.
 - **2026-10-15** — **Board host (single admin):** one agent flagged `is_admin`
