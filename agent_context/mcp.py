@@ -445,7 +445,7 @@ TOOLS = [
          "agent": {"type": "string"}}, "required": ["agent"]}},
     {"name": "set_policy", "description": "Set an agent's check policy. "
      "Example: {gates:[\"brain\",\"thermal\"], poll:{every_min:5, "
-     "actions:[\"peer_inbox\"]}, on_fail:\"block\"}.",
+     "actions:[\"peer_inbox\",\"board_tick\"]}, on_fail:\"block\"}.",
      "inputSchema": {"type": "object", "properties": {
          "agent": {"type": "string"}, "policy": {"type": "object"}},
          "required": ["agent", "policy"]}},
@@ -455,9 +455,25 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {
          "agent": {"type": "string"}}, "required": ["agent"]}},
     {"name": "agent_poll", "description": "Run periodic poll actions "
-     "(e.g. peer_inbox) then refresh gates. Call on the agent's poll.every_min.",
+     "(peer_inbox, board_tick) then refresh gates. Call on poll.every_min.",
      "inputSchema": {"type": "object", "properties": {
          "agent": {"type": "string"}}, "required": ["agent"]}},
+    {"name": "board_tick", "description": "One tick of board work: ready check, "
+     "inbox titles, next assigned task (continue|claim|idle|block). "
+     "Pass claim=true to claim the open task this tick.",
+     "inputSchema": {"type": "object", "properties": {
+         "agent": {"type": "string"},
+         "chat": {"type": "string", "default": "peers"},
+         "claim": {"type": "boolean", "default": False}},
+         "required": ["agent"]}},
+    {"name": "reassign_task", "description": "Move a task to another board "
+     "member. Claimed tasks reopen so the new agent must claim.",
+     "inputSchema": {"type": "object", "properties": {
+         "id": {"type": "integer"},
+         "to_agent": {"type": "string"},
+         "by": {"type": "string"},
+         "reopen": {"type": "boolean", "default": True}},
+         "required": ["id", "to_agent"]}},
     {"name": "whoami", "description": "Identity check for the calling key. "
      "Pass the same X-Token you use for MCP. Returns agent name, boards, "
      "key_ok. Prefer GET /api/whoami with your agent key.",
@@ -611,6 +627,23 @@ def _agent_poll(brain, args):
     return checks.agent_poll(brain.con, args.get("agent") or "")
 
 
+def _board_tick(brain, args):
+    from . import roster
+    return roster.board_tick(
+        brain.con, args.get("agent") or "",
+        chat=args.get("chat"),
+        claim=bool(args.get("claim")))
+
+
+def _reassign_task(brain, args):
+    from . import roster
+    return roster.reassign_task(
+        brain.con, int(args.get("id") or 0),
+        args.get("to_agent") or "",
+        by=args.get("by") or "",
+        reopen=False if args.get("reopen") is False else True)
+
+
 def _whoami(brain, args):
     from . import roster
     tok = (args.get("token") or "").strip()
@@ -660,7 +693,7 @@ TOOL_FUNCS = {t["name"]: f for t, f in zip(
             _remove_board_member, _list_tasks, _add_task, _claim_task,
             _update_task, _list_briefs, _get_brief, _set_brief,
             _session_pack, _get_policy, _set_policy, _agent_ready,
-            _agent_poll, _whoami, _join_agent])}
+            _agent_poll, _board_tick, _reassign_task, _whoami, _join_agent])}
 
 
 def handle(brain, msg):

@@ -617,6 +617,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/roster/tasks/update", "/api/roster/rules",
             "/api/roster/briefs", "/api/roster/policies",
             "/api/roster/ready", "/api/roster/poll",
+            "/api/roster/tick", "/api/roster/tasks/reassign",
             "/api/roster/join",
         ):
             return self._json(404, {"error": "not found"})
@@ -743,6 +744,23 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self._json(200, checks.agent_poll(
                     BRAIN.con, payload.get("agent") or ""))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/tick":
+            try:
+                return self._json(200, roster.board_tick(
+                    BRAIN.con, payload.get("agent") or "",
+                    chat=payload.get("chat"),
+                    claim=bool(payload.get("claim"))))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/tasks/reassign":
+            try:
+                return self._json(200, roster.reassign_task(
+                    BRAIN.con, int(payload.get("id") or 0),
+                    payload.get("to_agent") or payload.get("assignee") or "",
+                    by=payload.get("by") or "",
+                    reopen=False if payload.get("reopen") is False else True))
             except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
         if path == "/api/roster/join":

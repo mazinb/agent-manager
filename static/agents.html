@@ -207,7 +207,7 @@ tr:last-child td{border-bottom:0}
         </div>
         <button type="button" class="btn primary" id="btn-add-task">Add</button>
       </div>
-      <p class="hint">Only board members can be assigned or claim.</p>
+      <p class="hint">Only board members can be assigned or claim. Change Who to reassign. Hermes ticks via <code>board_tick</code>.</p>
     </section>
 
     <section class="sec">
@@ -399,6 +399,14 @@ function renderTeam(){
   });
 }
 
+function memberOptions(selected){
+  const members = (BOARD && BOARD.members) || [];
+  const opts = ['<option value="">—</option>'].concat(
+    members.map(m =>
+      `<option value="${esc(m.agent)}" ${m.agent===selected?'selected':''}>${esc(m.label || m.agent)}</option>`));
+  return opts.join('');
+}
+
 function renderTasks(){
   if(!TASKS.length){
     $('task-rows').innerHTML = '<tr><td colspan="5" class="hint">No tasks.</td></tr>';
@@ -408,7 +416,10 @@ function renderTasks(){
     `<tr>
       <td><div class="name" style="font-family:inherit;font-weight:600">${esc(t.title)}</div>
         ${t.body ? `<div class="hint" style="margin:2px 0 0">${esc(t.body.slice(0,80))}</div>` : ''}</td>
-      <td><span class="name">${esc(t.assignee || '—')}</span>
+      <td>${t.status==='done'
+        ? `<span class="name">${esc(t.assignee || '—')}</span>`
+        : `<select class="t-reassign" data-id="${t.id}" aria-label="Reassign"
+             style="height:30px;width:auto;min-width:110px;font-size:12px;padding:0 6px">${memberOptions(t.assignee || '')}</select>`}
         ${t.created_by ? `<div class="dim-txt" style="margin:0">by ${esc(t.created_by)}</div>` : ''}</td>
       <td class="hide-sm"><span class="mode-txt">${t.parallel?'parallel':'serial'}</span></td>
       <td><span class="status-txt ${esc(t.status)}">${esc(t.status)}</span></td>
@@ -432,6 +443,19 @@ function renderTasks(){
     b.onclick = async () => {
       await api('/api/roster/tasks/update', {method:'POST', body: JSON.stringify({id:+b.dataset.done, status:'done'})});
       await refresh();
+    };
+  });
+  $('task-rows').querySelectorAll('.t-reassign').forEach(sel => {
+    sel.onchange = async () => {
+      const to = sel.value;
+      if(!to) return;
+      try {
+        await api('/api/roster/tasks/reassign', {
+          method:'POST',
+          body: JSON.stringify({id:+sel.dataset.id, to_agent: to, by: 'ui'}),
+        });
+        await refresh();
+      } catch(e){ alert(e.message); sel.value = ''; }
     };
   });
 }

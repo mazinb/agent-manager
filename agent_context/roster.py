@@ -880,3 +880,107 @@ def update_task(con, task_id, status=None, assignee=None, parallel=None,
     con.commit()
     return next(t for t in list_tasks(con, board_id=row["board_id"], limit=500)
                 if t["id"] == task_id)
+
+
+def reassign_task(con, task_id, to_agent, by="", reopen=True):
+    """Move a task to another board member.
+
+    Claimed work reopens so the new agent must claim (avoids silent steal).
+    """
+    _ensure(con)
+    to_agent = _slug(to_agent)
+    row = con.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+    if not row:
+        raise ValueError("unknown task")
+    if not to_agent:
+        raise ValueError("to_agent required")
+    if not is_member(con, row["board_id"], to_agent):
+        raise ValueError(f"{to_agent} is not on this board")
+    status = None
+    if reopen and row["status"] == "claimed" and row["assignee"] != to_agent:
+        status = "open"
+    task = update_task(con, task_id, assignee=to_agent, status=status)
+    return {
+        "ok": True,
+        "task": task,
+        "from": row["assignee"] or "",
+        "to": to_agent,
+        "by": _slug(by) if by else "",
+        "reopened": status == "open",
+    }
+
+
+def pick_tick_task(con, agent, chat=None, board_id=None):
+    """Choose the one task this agent should work on this tick.
+
+    Priority: already-claimed by agent → oldest open/blocked assigned to agent.
+    Returns (task_or_None, action) where action is continue|claim|idle.
+    """
+    _ensure(con)
+    agent = _slug(agent)
+    bid = _resolve_board_id(con, board_id=board_id, chat=chat)
+    claimed = [
+        t for t in list_tasks(con, status="claimed", board_id=bid, limit=200)
+        if t["assignee"] == agent
+    ]
+    if claimed:
+        claimed.sort(key=lambda t: t["updated_at"] or t["created_at"])
+        return claimed[0], "continue"
+    mine = []
+    for st in ("open", "blocked"):
+        for t in list_tasks(con, status=st, board_id=bid, limit=200):
+            if t["assignee"] == agent:
+                mine.append(t)
+    if not mine:
+        return None, "idle"
+    mine.sort(key=lambda t: t["created_at"])
+    return mine[0], "claim"
+
+
+def board_tick(con, agent, chat=None, board_id=None, claim=False):
+    """One tick of board work for an agent (cron/skill friendly).
+
+    Runs readiness, surfaces inbox titles, and either continues a claimed
+    task, offers the next assigned open task (optionally claims it), or
+    reports idle.
+    """
+    _ensure(con)
+    from . import checks, store
+    agent = _slug(agent)
+    chat = chat or DEFAULT_CHAT
+    ready = checks.agent_ready(con, agent)
+    inbox = store.list_peer_messages(con, to_agent=agent, limit=8)
+    inbox_titles = [m.get("title") for m in inbox[:5]]
+    if ready.get("blocked"):
+        return {
+            "agent": agent,
+            "chat": chat,
+            "action": "block",
+            "ready": ready,
+            "task": None,
+            "inbox_count": len(inbox),
+            "inbox_titles": inbox_titles,
+            "hint": "gates blocked — reply peers role:block; do not claim",
+        }
+    task, action = pick_tick_task(
+        con, agent, chat=chat, board_id=board_id)
+    if action == "claim" and claim and task:
+        task = claim_task(con, task["id"], agent)
+        action = "claimed"
+    hints = {
+        "continue": "finish claimed task, then update_task status=done + "
+                    "message_peer role:done",
+        "claim": "claim_task then do the body; one job this tick",
+        "claimed": "task claimed — do the body this tick",
+        "idle": "no assigned open tasks — check inbox / wait for handoff",
+    }
+    return {
+        "agent": agent,
+        "chat": chat,
+        "action": action,
+        "ready": ready,
+        "task": task,
+        "inbox_count": len(inbox),
+        "inbox_titles": inbox_titles,
+        "hint": hints.get(action, ""),
+    }

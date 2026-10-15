@@ -22,12 +22,12 @@ AM_URL = os.environ.get("AGENT_MANAGER_URL", "http://127.0.0.1:8075")
 # Gates must pass before work when listed under policy.gates.
 # Poll actions run on policy.poll.every_min (skill/timer driven).
 KNOWN_GATES = ("brain", "thermal", "agent_manager")
-KNOWN_POLL = ("peer_inbox",)
+KNOWN_POLL = ("peer_inbox", "board_tick")
 
 DEFAULT_POLICIES = {
     "hermes": {
         "gates": ["brain", "thermal"],
-        "poll": {"every_min": 5, "actions": ["peer_inbox"]},
+        "poll": {"every_min": 5, "actions": ["peer_inbox", "board_tick"]},
         "on_fail": "block",
     },
     "cursor": {
@@ -238,8 +238,23 @@ def _poll_peer_inbox(con, agent: str) -> dict:
     }
 
 
+def _poll_board_tick(con, agent: str) -> dict:
+    """Surface the next board task without auto-claiming (skill decides)."""
+    from . import roster
+    tick = roster.board_tick(con, agent, claim=False)
+    return {
+        "ok": True,
+        "detail": tick.get("action") or "idle",
+        "action": tick.get("action"),
+        "task_id": (tick.get("task") or {}).get("id") if tick.get("task") else None,
+        "title": (tick.get("task") or {}).get("title") if tick.get("task") else None,
+        "tick": tick,
+    }
+
+
 POLL_FUNCS = {
     "peer_inbox": _poll_peer_inbox,
+    "board_tick": _poll_board_tick,
 }
 
 
