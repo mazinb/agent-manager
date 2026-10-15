@@ -104,6 +104,11 @@ tr:last-child td{border-bottom:0}
 .brief-edit .b-meter{color:var(--dim);font-size:12px}
 .brief-edit .b-meter.over{color:var(--warn)}
 .brief-edit .actions{margin-top:8px}
+.brief-rows tr[data-agent]{cursor:pointer}
+.brief-rows tr[data-agent]:hover td{background:#17181b80}
+.brief-prev{color:var(--dim);font-size:12px;margin:2px 0 0;font-weight:400;
+  font-family:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:36ch}
+.seen-never{color:var(--warn)}
 
 @media (max-width:640px){
   .top{padding:0 10px}
@@ -209,10 +214,10 @@ tr:last-child td{border-bottom:0}
       <h2>Briefs</h2>
       <table>
         <thead><tr><th>Agent</th><th class="hide-sm">Routes</th><th>Size</th><th></th></tr></thead>
-        <tbody id="brief-rows"></tbody>
+        <tbody id="brief-rows" class="brief-rows"></tbody>
       </table>
       <div id="brief-edit" class="brief-edit hidden"></div>
-      <p class="hint" id="brief-hint">Markdown per member. Loaded at chat start.</p>
+      <p class="hint" id="brief-hint">One markdown brief per member · loaded at chat start · tap a row to edit</p>
     </section>
   </div>
 </main>
@@ -328,12 +333,13 @@ function renderTeam(){
       readyCls = 'status-txt blocked';
     }
     const seen = fmtSeen(a.last_seen_at);
+    const seenCls = a.last_seen_at ? 'dim-txt' : 'seen-never';
     return `<tr>
       <td><span class="name">${esc(a.label)}</span>
         <div class="dim-txt" style="margin:0">${esc(n)}</div></td>
       <td><span class="role-txt">${esc(role || '—')}</span></td>
       <td><span class="${readyCls}">${esc(readyTxt)}</span></td>
-      <td><span class="dim-txt">${esc(seen)}</span></td>
+      <td><span class="${seenCls}">${esc(seen)}</span></td>
       <td><span class="dim-txt">${key}</span></td>
       <td style="text-align:right;white-space:nowrap">
         <details class="menu">
@@ -441,6 +447,18 @@ function routeLabel(b){
   return rs.map(r => r.match).join(', ');
 }
 
+function briefPreview(b){
+  const raw = (b.body || '').replace(/^---[\s\S]*?---\s*/m, '').replace(/^#+\s*.+$/m, '');
+  const line = raw.replace(/\s+/g, ' ').trim();
+  if(!line) return 'empty';
+  return line.slice(0, 72);
+}
+
+function toggleBrief(agent){
+  EDIT_AGENT = EDIT_AGENT === agent ? null : agent;
+  renderBriefs();
+}
+
 function renderBriefs(){
   const members = (BOARD && BOARD.members) || [];
   const rows = members.length ? members : AGENTS.map(a => ({agent:a.name, label:a.label}));
@@ -454,8 +472,10 @@ function renderBriefs(){
     const agent = m.agent || m.name;
     const b = briefBy(agent);
     const open = EDIT_AGENT === agent;
-    return `<tr data-agent="${esc(agent)}">
-      <td class="name">${esc(m.label || agent)}</td>
+    const prev = briefPreview(b);
+    return `<tr data-agent="${esc(agent)}" class="${open ? 'open' : ''}">
+      <td><span class="name">${esc(m.label || agent)}</span>
+        <div class="brief-prev">${esc(prev)}</div></td>
       <td class="dim-txt hide-sm">${esc(routeLabel(b))}</td>
       <td class="dim-txt">${b.chars || 0}</td>
       <td style="text-align:right">
@@ -463,11 +483,16 @@ function renderBriefs(){
       </td>
     </tr>`;
   }).join('');
+  $('brief-rows').querySelectorAll('tr[data-agent]').forEach(tr => {
+    tr.onclick = (e) => {
+      if(e.target.closest('button')) return;
+      toggleBrief(tr.dataset.agent);
+    };
+  });
   $('brief-rows').querySelectorAll('.b-edit').forEach(btn => {
-    btn.onclick = () => {
-      const a = btn.dataset.agent;
-      EDIT_AGENT = EDIT_AGENT === a ? null : a;
-      renderBriefs();
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      toggleBrief(btn.dataset.agent);
     };
   });
   renderBriefEditor();

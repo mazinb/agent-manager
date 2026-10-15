@@ -116,6 +116,13 @@ class RosterTasks(unittest.TestCase):
         self.assertTrue(briefs["hermes"]["body"])
         self.assertLessEqual(briefs["hermes"]["chars"], roster.MAX_BRIEF_CHARS)
 
+    def test_late_joiner_gets_default_brief(self):
+        con = fresh()
+        roster.add_member(con, chat="peers", agent="designer", role="worker")
+        briefs = {b["agent"]: b for b in roster.list_briefs(con, chat="peers")}
+        self.assertIn("designer", briefs)
+        self.assertIn("punch", briefs["designer"]["body"].lower())
+
     def test_brief_routes_auto_assign(self):
         con = fresh()
         roster.set_brief(con, "hermes",

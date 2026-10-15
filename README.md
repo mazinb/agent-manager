@@ -128,6 +128,11 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — Agents design pass: Briefs one-line preview + tap row to
+  edit; Key used warns when never; default briefs for designer +
+  hermes-connector. Cursor owns UI/design; Hermes owns on-device exec.
+- **2026-10-15** — Key used = agent-key auth only; compact `GET /api/tools`
+  for chat UIs that truncate fat `tools/list` schemas. FAQ on `/join/`.
 - **2026-10-15** — Join-the-bus feedback: `GET /api/whoami`, clearer 401
   hints, `/join/` + `docs/JOIN.md`, Team last-seen, `join_agent` (add +
   mint), `message_peer` broadcast (`to_agent=all`), combined required-field

@@ -40,8 +40,9 @@ DEFAULT_BRIEFS = {
         "routes: code=parallel, plan=parallel\n"
         "---\n\n"
         "# Cursor\n\n"
-        "Planner / supervisor. Hand off on-device work to Hermes; ask "
-        "grok-bot for design review. Write short `role: plan|handoff` notes.\n"
+        "Planner / supervisor. Own complex design/UI work; hand on-device "
+        "exec to Hermes; ask designer/grok-bot for punch lists. "
+        "Short `role: plan|handoff` notes.\n"
     ),
     "grok-bot": (
         "---\n"
@@ -50,6 +51,22 @@ DEFAULT_BRIEFS = {
         "# Grok Bot\n\n"
         "Design and review peer. Punch lists over essays. Reply on peers; "
         "do not dump long threads into briefs.\n"
+    ),
+    "designer": (
+        "---\n"
+        "routes: review=parallel, design=parallel\n"
+        "---\n\n"
+        "# Designer\n\n"
+        "UI review peer. Short punch lists on /agents/ and /join/. "
+        "Keep palette and flat sections; no cards/pills/emoji.\n"
+    ),
+    "hermes-connector": (
+        "---\n"
+        "routes: bridge=parallel\n"
+        "---\n\n"
+        "# Hermes Connector\n\n"
+        "Bridge Hermes chats onto the peers bus. Use your own agent key "
+        "(not admin). Prefer message_peer; keep feedback short.\n"
     ),
 }
 
@@ -167,12 +184,19 @@ def _ensure(con):
 
     for name, _, _ in DEFAULT_AGENTS:
         _ensure_member(con, board["id"], name, role="worker")
-        if name in DEFAULT_BRIEFS:
-            row = con.execute(
-                "SELECT 1 FROM agent_briefs WHERE board_id=? AND agent=?",
-                (board["id"], name)).fetchone()
-            if not row:
-                _write_brief_raw(con, board["id"], name, DEFAULT_BRIEFS[name])
+    # Seed default briefs for any board member that has a template (incl.
+    # late joiners like designer / hermes-connector).
+    for name, body in DEFAULT_BRIEFS.items():
+        mem = con.execute(
+            "SELECT 1 FROM board_members WHERE board_id=? AND agent=?",
+            (board["id"], name)).fetchone()
+        if not mem:
+            continue
+        row = con.execute(
+            "SELECT 1 FROM agent_briefs WHERE board_id=? AND agent=?",
+            (board["id"], name)).fetchone()
+        if not row:
+            _write_brief_raw(con, board["id"], name, body)
 
 
 def _slug(name: str) -> str:
@@ -321,6 +345,12 @@ def add_member(con, board_id=None, chat=None, agent="", role="worker"):
             "INSERT INTO board_members(board_id, agent, role, added_at) "
             "VALUES(?,?,?,?)",
             (board["id"], agent, role, time.time()))
+        if agent in DEFAULT_BRIEFS:
+            existing = con.execute(
+                "SELECT 1 FROM agent_briefs WHERE board_id=? AND agent=?",
+                (board["id"], agent)).fetchone()
+            if not existing:
+                _write_brief_raw(con, board["id"], agent, DEFAULT_BRIEFS[agent])
     con.commit()
     return get_board(con, board_id=board["id"])
 
