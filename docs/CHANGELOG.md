@@ -2,6 +2,11 @@
 
 Moved from the root README so agent instructions stay crisp.
 
+- **2026-10-15** — **Inbox list pass:** dropped the duplicate "Agents | Exit"
+  row under the top nav (Agents was repeated; Exit now lives in the Agents
+  sheet); thread rows tightened to two lines (name · age · count / one-line
+  preview) — was three loose lines; board strip shows counts ("board · 5 on ·
+  3 open") instead of a wrapping member list.
 - **2026-10-15** — **Inbox polish (utility-first):** thread list hides empty
   projects (only real conversations, newest activity first); chat groups
   consecutive messages per author — name shown once per run, no repeats
