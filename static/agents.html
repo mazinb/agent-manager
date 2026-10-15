@@ -6,9 +6,9 @@
 <title>Agents — Zoro</title>
 <style>
 :root{
-  --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#e6edf3;
-  --dim:#8b949e; --faint:#6e7681; --acc:#58a6ff; --acc-dim:#58a6ff33;
-  --ok:#3fb950; --warn:#d29922; --chrome-h:48px;
+  --bg:#111214; --panel:#17181b; --border:#26272b; --fg:#e6e4df;
+  --dim:#9c9a94; --faint:#6f6d68; --acc:#d9a55b; --acc-dim:#d9a55b26;
+  --ok:#4a9d5f; --warn:#d29922; --chrome-h:48px;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);
@@ -18,35 +18,49 @@ code{font:12.5px/1.4 ui-monospace,Menlo,monospace}
 
 .top{display:flex;align-items:center;gap:10px;height:var(--chrome-h);
   padding:0 14px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30;
-  background:#0d1117f5;backdrop-filter:blur(10px)}
+  background:#111214f5;backdrop-filter:blur(10px)}
 .top .brand{font-size:15px;font-weight:700;letter-spacing:-.02em;color:var(--fg)}
 .top .brand:hover{color:var(--acc)}
 .top nav{margin-left:auto;display:flex;gap:2px}
-.top nav a{color:var(--dim);font-size:13px;padding:6px 10px;border-radius:8px}
-.top nav a:hover{color:var(--fg);background:#21262d}
+.top nav a{color:var(--dim);font-size:13px;padding:6px 10px;border-radius:4px}
+.top nav a:hover{color:var(--fg);background:var(--panel)}
 .top nav a.on{color:var(--acc);background:var(--acc-dim)}
 
-.wrap{max-width:720px;margin:0 auto;padding:20px 16px 72px}
-.hero{font-size:clamp(22px,4vw,28px);margin:0 0 6px;letter-spacing:-.02em;font-weight:650}
-.sub{color:var(--dim);margin:0 0 16px;font-size:14px}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
-  padding:14px 16px;margin:0 0 12px}
-.card h2{margin:0 0 10px;font-size:15px;font-weight:600}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px 72px}
+.sub{color:var(--dim);margin:0;font-size:13px}
 .hint{font-size:12px;color:var(--dim);margin:8px 0 0}
 .warn{color:var(--warn)}.okmsg{color:var(--ok)}.hidden{display:none!important}
 
+/* slim page actions row under the header */
+.page-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:10px 0;border-bottom:1px solid var(--border)}
+.page-actions .spacer{margin-left:auto}
+.page-actions select{width:auto;min-width:160px}
+
+/* flat sections: thin headings + dividers, no cards */
+.sec{padding:18px 0 20px;border-bottom:1px solid var(--border)}
+.sec:last-child{border-bottom:0}
+.sec > h2{margin:0 0 12px;font-size:11px;font-weight:600;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.08em}
+
 .btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;
-  gap:6px;padding:8px 12px;border-radius:8px;font-weight:600;font-size:13px;
+  gap:6px;padding:0 12px;height:32px;border-radius:4px;font-weight:600;font-size:13px;
   border:1px solid transparent;cursor:pointer;font-family:inherit;color:inherit;background:none}
-.btn.primary{background:var(--acc);color:#04121f}
-.btn.ghost{background:#0d1117;color:var(--fg);border-color:var(--border)}
-.btn.ghost:hover{border-color:#484f58}
+.btn.primary{background:var(--acc);color:#1a1206}
+.btn.ghost{background:transparent;color:var(--fg);border-color:var(--border)}
+.btn.ghost:hover{border-color:#3a3b40}
+.btn.danger{color:#d98f7f;border-color:var(--border)}
+.btn.danger:hover{border-color:#5a3a32}
 .btn.ok{background:var(--ok);color:#04120a}
 .btn:disabled{opacity:.45;cursor:default}
+.icon-btn{width:32px;padding:0;font-weight:400;font-size:15px;color:var(--dim)}
+.icon-btn:hover{color:var(--fg)}
 .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 
-input,select,textarea{width:100%;background:#0d1117;border:1px solid var(--border);
-  color:var(--fg);border-radius:8px;padding:9px 11px;font:inherit}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);
+  color:var(--fg);border-radius:4px;padding:0 11px;height:44px;font:inherit}
+textarea{height:auto;min-height:44px;padding:10px 11px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
 label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
 .field{flex:1;min-width:120px}
@@ -54,24 +68,47 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;
   text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--border)}
-td{padding:10px 8px;border-bottom:1px solid #21262d;vertical-align:middle}
+td{padding:10px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
 tr:last-child td{border-bottom:0}
 .name{font-weight:650;font-family:ui-monospace,Menlo,monospace;font-size:13px}
-.pill{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px;
-  background:#21262d;color:var(--dim)}
-.pill.on{background:#1d3a2a;color:#7fd6a4}
-.pill.serial{background:#3a2a1d;color:#e3b341}
-.pill.open{background:#243044;color:#9fb4d4}
-.pill.claimed{background:#2b2436;color:#c9a7f5}
-.pill.done{background:#1d3a2a;color:#7fd6a4}
-.pill.blocked{background:#3a1d1d;color:#f58f7f}
+.dim-txt{color:var(--dim);font-size:12px}
+/* roles/modes are plain dim text — no pills */
+.role-txt,.mode-txt,.status-txt{color:var(--dim);font-size:12.5px}
+.status-txt.open{color:var(--acc)}
+.status-txt.done{color:var(--ok)}
+.status-txt.blocked{color:var(--warn)}
 
-.reveal{background:#0d1117;border:1px solid var(--warn);border-radius:10px;padding:12px;margin-top:10px}
+/* one row action menu */
+.menu{position:relative;display:inline-block}
+.menu>summary{list-style:none;cursor:pointer;width:30px;height:30px;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:15px}
+.menu>summary::-webkit-details-marker{display:none}
+.menu>summary:hover{background:var(--panel);color:var(--fg)}
+.menu-items{position:absolute;right:0;top:32px;z-index:20;min-width:170px;
+  background:var(--panel);border:1px solid var(--border);border-radius:4px;
+  padding:6px;display:flex;flex-direction:column;gap:4px}
+.menu-items .btn{width:100%;justify-content:flex-start;height:34px;font-weight:500}
+.menu-items .m-add{display:flex;gap:6px;align-items:center}
+.menu-items .m-add select{height:34px;width:auto;flex:1;font-size:12px;padding:0 6px}
+.menu-items .m-add .btn{width:auto;height:34px}
+.menu[open] .menu-items{display:flex}
+
+.reveal{background:var(--panel);border:1px solid var(--warn);border-radius:4px;padding:12px;margin-top:10px}
 .reveal .tok{font:13px/1.4 ui-monospace,Menlo,monospace;word-break:break-all;margin:0 0 8px}
+
+/* rules: one row per rule */
+.rule{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.rule .r-text{color:var(--dim);font-size:12.5px;white-space:nowrap}
+.rule .r-arrow{color:var(--faint)}
+.rule .r-match{flex:1;min-width:140px;width:auto}
+.rule .r-agent{width:auto;min-width:130px;flex:0 0 auto}
+.rule .r-en{display:flex;align-items:center;gap:5px;color:var(--dim);font-size:12px;white-space:nowrap}
+.rule .r-en input{width:15px;height:15px;padding:0;accent-color:var(--acc)}
+.rule .r-del{flex:0 0 auto}
 
 @media (max-width:640px){
   .top{padding:0 10px}
-  .wrap{padding:16px 12px 64px}
+  .wrap{padding:0 12px 64px}
   .hide-sm{display:none}
 }
 </style>
@@ -86,13 +123,11 @@ tr:last-child td{border-bottom:0}
   </nav>
 </header>
 <main class="wrap">
-  <h1 class="hero">Agents</h1>
-  <p class="sub">Boards linked to inbox chats. Add agents, then assign work.</p>
 
-  <div class="card" id="gate">
-    <h2>Token</h2>
-    <p class="hint" id="gate-hint">Needed to manage agents.</p>
-    <div class="actions">
+  <div id="gate">
+    <div class="page-actions">
+      <span class="sub" id="gate-hint">Token needed to manage agents.</span>
+      <span class="spacer"></span>
       <button type="button" class="btn primary" id="btn-create">Create</button>
       <button type="button" class="btn ghost" id="btn-paste-toggle">Paste</button>
     </div>
@@ -111,51 +146,33 @@ tr:last-child td{border-bottom:0}
   </div>
 
   <div id="app" class="hidden">
-    <div class="card">
+    <div class="page-actions">
+      <button type="button" class="btn ghost" id="btn-refresh">Refresh</button>
+      <select id="board-sel" aria-label="Filter by chat"></select>
+      <span class="spacer"></span>
+      <span class="sub" id="board-link"></span>
+    </div>
+
+    <section class="sec">
       <h2>Board</h2>
       <div class="row">
-        <div class="field">
-          <label>Chat</label>
-          <select id="board-sel"></select>
-        </div>
         <div class="field">
           <label>New chat</label>
           <input id="new-chat" placeholder="e.g. travel">
         </div>
         <button type="button" class="btn primary" id="btn-new-board">Open</button>
       </div>
-      <p class="hint" id="board-link">Board ↔ inbox chat. Members may claim tasks.</p>
-    </div>
+      <p class="hint">Board ↔ inbox chat. Members may claim tasks.</p>
+    </section>
 
-    <div class="card">
-      <h2>Members</h2>
+    <section class="sec">
+      <h2>Team</h2>
       <table>
-        <thead><tr><th>Agent</th><th>Role</th><th></th></tr></thead>
-        <tbody id="member-rows"></tbody>
+        <thead><tr><th>Agent</th><th>Role</th><th>Mode</th><th>Key</th><th></th></tr></thead>
+        <tbody id="team-rows"></tbody>
       </table>
       <div class="row" style="margin-top:12px">
-        <div class="field"><label>Add agent</label>
-          <select id="member-agent"></select>
-        </div>
-        <div class="field" style="flex:0 0 120px"><label>Role</label>
-          <select id="member-role">
-            <option value="worker">worker</option>
-            <option value="member">member</option>
-            <option value="admin">admin</option>
-          </select>
-        </div>
-        <button type="button" class="btn primary" id="btn-add-member">Add</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Roster</h2>
-      <table>
-        <thead><tr><th>Agent</th><th>Key</th><th>Mode</th><th></th></tr></thead>
-        <tbody id="agent-rows"></tbody>
-      </table>
-      <div class="row" style="margin-top:12px">
-        <div class="field"><label>Name</label><input id="new-agent" placeholder="e.g. travel-helper"></div>
+        <div class="field"><label>Add agent</label><input id="new-agent" placeholder="e.g. travel-helper"></div>
         <button type="button" class="btn primary" id="btn-add-agent">Add</button>
       </div>
       <div id="key-once" class="reveal hidden">
@@ -166,12 +183,12 @@ tr:last-child td{border-bottom:0}
           <button type="button" class="btn ghost" id="btn-key-dismiss">Saved</button>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="card">
+    <section class="sec">
       <h2>Tasks</h2>
       <table>
-        <thead><tr><th>Task</th><th>Who</th><th>Mode</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Task</th><th>Who</th><th class="hide-sm">Mode</th><th>Status</th><th></th></tr></thead>
         <tbody id="task-rows"></tbody>
       </table>
       <div class="row" style="margin-top:12px">
@@ -180,22 +197,22 @@ tr:last-child td{border-bottom:0}
           <select id="task-assignee"><option value="">auto</option></select>
         </div>
         <div class="field" style="flex:0 0 auto">
-          <label><input type="checkbox" id="task-parallel"> Parallel</label>
+          <label><input type="checkbox" id="task-parallel" style="width:15px;height:15px;padding:0;accent-color:var(--acc)"> Parallel</label>
         </div>
         <button type="button" class="btn primary" id="btn-add-task">Add</button>
       </div>
       <p class="hint">Only board members can be assigned or claim.</p>
-    </div>
+    </section>
 
-    <div class="card">
+    <section class="sec">
       <h2>Rules</h2>
-      <p class="hint" style="margin:0 0 10px">Match text → agent on this board. First match wins.</p>
+      <p class="hint" style="margin:0 0 10px">First match wins.</p>
       <div id="rules"></div>
       <div class="actions">
         <button type="button" class="btn ghost" id="btn-add-rule">Add rule</button>
         <button type="button" class="btn primary" id="btn-save-rules">Save</button>
       </div>
-    </div>
+    </section>
   </div>
 </main>
 <script>
@@ -256,8 +273,7 @@ async function refresh(){
   TASKS = t.tasks || [];
   RULES = r.rules || [];
   renderBoards();
-  renderMembers();
-  renderAgents();
+  renderTeam();
   renderTasks();
   renderRules();
   const members = BOARD.members || [];
@@ -266,14 +282,8 @@ async function refresh(){
   sel.innerHTML = '<option value="">auto</option>' +
     members.map(x => `<option value="${x.agent}">${esc(x.label)}</option>`).join('');
   sel.value = cur;
-  const msel = $('member-agent');
-  const onBoard = new Set(members.map(m => m.agent));
-  msel.innerHTML = AGENTS.filter(x => !onBoard.has(x.name))
-    .map(x => `<option value="${x.name}">${esc(x.label)}</option>`).join('')
-    || '<option value="">—</option>';
   $('board-link').innerHTML =
-    `Linked to inbox <a href="/inbox/">chat</a> <code>${esc(CHAT)}</code>` +
-    ` · ${BOARD.open_tasks || 0} open`;
+    `chat <code>${esc(CHAT)}</code> · ${BOARD.open_tasks || 0} open`;
 }
 
 function renderBoards(){
@@ -285,24 +295,56 @@ function renderBoards(){
   ).join('');
 }
 
-function renderMembers(){
-  const members = (BOARD && BOARD.members) || [];
-  if(!members.length){
-    $('member-rows').innerHTML = '<tr><td colspan="3" class="hint">No members.</td></tr>';
+/* Team: roster + board membership merged into one list */
+function renderTeam(){
+  const members = new Map(((BOARD && BOARD.members) || []).map(m => [m.agent, m]));
+  const names = new Set([
+    ...AGENTS.map(a => a.name),
+    ...members.keys(),
+  ]);
+  if(!names.size){
+    $('team-rows').innerHTML = '<tr><td colspan="5" class="hint">No agents.</td></tr>';
     return;
   }
-  $('member-rows').innerHTML = members.map(m =>
-    `<tr>
-      <td><span class="name">${esc(m.label)}</span>
-        <div class="hint" style="margin:0">${esc(m.agent)}</div></td>
-      <td><span class="pill on">${esc(m.role)}</span></td>
-      <td style="text-align:right">
-        <button type="button" class="btn ghost" data-rm="${esc(m.agent)}">Remove</button>
+  const byName = new Map(AGENTS.map(a => [a.name, a]));
+  $('team-rows').innerHTML = [...names].sort().map(n => {
+    const a = byName.get(n) || {name:n, label:n, has_key:false, token_hint:'', parallel_ok:true};
+    const m = members.get(n);
+    const role = m ? m.role : '';
+    const key = a.has_key ? `set ····${esc(a.token_hint||'')}` : 'none';
+    const mode = a.parallel_ok ? 'parallel' : 'serial';
+    return `<tr>
+      <td><span class="name">${esc(a.label)}</span>
+        <div class="dim-txt" style="margin:0">${esc(n)}</div></td>
+      <td><span class="role-txt">${esc(role || '—')}</span></td>
+      <td><span class="mode-txt">${mode}</span></td>
+      <td><span class="dim-txt">${key}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        <details class="menu">
+          <summary aria-label="Actions">···</summary>
+          <div class="menu-items">
+            <button type="button" class="btn ghost" data-key="${esc(n)}">Mint key</button>
+            ${m
+              ? `<button type="button" class="btn danger" data-rm="${esc(n)}">Remove from board</button>`
+              : `<div class="m-add">
+                   <select class="m-role" data-add-role="${esc(n)}">
+                     <option value="worker">worker</option>
+                     <option value="member">member</option>
+                     <option value="admin">admin</option>
+                   </select>
+                   <button type="button" class="btn primary" data-add="${esc(n)}">Add</button>
+                 </div>`}
+          </div>
+        </details>
       </td>
-    </tr>`
-  ).join('');
-  $('member-rows').querySelectorAll('[data-rm]').forEach(b => {
+    </tr>`;
+  }).join('');
+  $('team-rows').querySelectorAll('[data-key]').forEach(b => {
+    b.onclick = () => { b.closest('details').open = false; mintKey(b.dataset.key); };
+  });
+  $('team-rows').querySelectorAll('[data-rm]').forEach(b => {
     b.onclick = async () => {
+      b.closest('details').open = false;
       if(!confirm('Remove '+b.dataset.rm+'?')) return;
       try {
         await api('/api/roster/board/members/remove', {
@@ -311,21 +353,17 @@ function renderMembers(){
       } catch(e){ alert(e.message); }
     };
   });
-}
-
-function renderAgents(){
-  $('agent-rows').innerHTML = AGENTS.map(a =>
-    `<tr>
-      <td><span class="name">${esc(a.label)}</span><div class="hint" style="margin:0">${esc(a.name)}</div></td>
-      <td>${a.has_key ? '<span class="pill on">••••'+esc(a.token_hint)+'</span>' : '<span class="pill">none</span>'}</td>
-      <td><span class="pill ${a.parallel_ok?'on':'serial'}">${a.parallel_ok?'parallel':'serial'}</span></td>
-      <td style="text-align:right;white-space:nowrap">
-        <button type="button" class="btn ghost" data-key="${esc(a.name)}">Key</button>
-      </td>
-    </tr>`
-  ).join('');
-  $('agent-rows').querySelectorAll('[data-key]').forEach(b => {
-    b.onclick = () => mintKey(b.dataset.key);
+  $('team-rows').querySelectorAll('[data-add]').forEach(b => {
+    b.onclick = async () => {
+      const n = b.dataset.add;
+      const role = b.parentElement.querySelector('.m-role').value;
+      b.closest('details').open = false;
+      try {
+        await api('/api/roster/board/members', {method:'POST', body: JSON.stringify({
+          chat: CHAT, agent: n, role})});
+        await refresh();
+      } catch(e){ alert(e.message); }
+    };
   });
 }
 
@@ -338,9 +376,10 @@ function renderTasks(){
     `<tr>
       <td><div class="name" style="font-family:inherit;font-weight:600">${esc(t.title)}</div>
         ${t.body ? `<div class="hint" style="margin:2px 0 0">${esc(t.body.slice(0,80))}</div>` : ''}</td>
-      <td class="name">${esc(t.assignee || '—')}</td>
-      <td><span class="pill ${t.parallel?'on':'serial'}">${t.parallel?'∥':'→'}</span></td>
-      <td><span class="pill ${esc(t.status)}">${esc(t.status)}</span></td>
+      <td><span class="name">${esc(t.assignee || '—')}</span>
+        ${t.created_by ? `<div class="dim-txt" style="margin:0">by ${esc(t.created_by)}</div>` : ''}</td>
+      <td class="hide-sm"><span class="mode-txt">${t.parallel?'parallel':'serial'}</span></td>
+      <td><span class="status-txt ${esc(t.status)}">${esc(t.status)}</span></td>
       <td style="text-align:right;white-space:nowrap">
         ${t.status==='open'||t.status==='blocked'
           ? `<button type="button" class="btn ghost" data-claim="${t.id}">Claim</button>` : ''}
@@ -369,14 +408,14 @@ function renderRules(){
   const members = (BOARD && BOARD.members) || [];
   const opts = members.length ? members : AGENTS.map(a => ({agent:a.name, label:a.label}));
   $('rules').innerHTML = RULES.map((r,i) =>
-    `<div class="row rule" data-i="${i}" style="margin-bottom:8px">
-      <div class="field"><label>Match</label><input class="r-match" value="${esc(r.match)}"></div>
-      <div class="field"><label>Agent</label>
-        <select class="r-agent">${opts.map(a =>
-          `<option value="${a.agent || a.name}" ${(a.agent||a.name)===r.agent?'selected':''}>${esc(a.label)}</option>`).join('')}</select>
-      </div>
-      <div class="field" style="flex:0 0 auto"><label><input type="checkbox" class="r-par" ${r.parallel?'checked':''}> ∥</label></div>
-      <button type="button" class="btn ghost r-del">×</button>
+    `<div class="rule" data-i="${i}">
+      <span class="r-text">if text contains</span>
+      <input class="r-match" value="${esc(r.match)}" placeholder="text">
+      <span class="r-arrow">&rarr;</span>
+      <select class="r-agent">${opts.map(a =>
+        `<option value="${a.agent || a.name}" ${(a.agent||a.name)===r.agent?'selected':''}>${esc(a.label)}</option>`).join('')}</select>
+      <label class="r-en"><input type="checkbox" class="r-en-box" ${r.enabled !== false ? 'checked' : ''}> enabled</label>
+      <button type="button" class="btn ghost icon-btn r-del" aria-label="Delete rule">&times;</button>
     </div>`
   ).join('') || '<p class="hint">No rules.</p>';
   $('rules').querySelectorAll('.r-del').forEach(b => {
@@ -407,6 +446,7 @@ $('btn-key-dismiss').onclick = () => {
   $('key-tok').textContent = '';
 };
 $('btn-copy-key').onclick = ev => copy($('key-tok').textContent, ev.currentTarget);
+$('btn-refresh').onclick = () => refresh().catch(e => alert(e.message));
 
 $('board-sel').onchange = async () => {
   CHAT = $('board-sel').value;
@@ -420,14 +460,6 @@ $('btn-new-board').onclick = async () => {
   CHAT = chat;
   $('new-chat').value = '';
   history.replaceState(null, '', '?chat=' + encodeURIComponent(CHAT));
-  await refresh();
-};
-$('btn-add-member').onclick = async () => {
-  const agent = $('member-agent').value;
-  if(!agent) return;
-  await api('/api/roster/board/members', {method:'POST', body: JSON.stringify({
-    chat: CHAT, agent, role: $('member-role').value,
-  })});
   await refresh();
 };
 
@@ -458,14 +490,16 @@ $('btn-add-task').onclick = async () => {
 $('btn-add-rule').onclick = () => {
   const members = (BOARD && BOARD.members) || [];
   RULES.push({match:'', agent: members[0]?.agent || AGENTS[0]?.name || 'hermes',
-              parallel:false, priority:0});
+              parallel:false, enabled:true, priority:0});
   renderRules();
 };
 $('btn-save-rules').onclick = async () => {
-  const rules = [...$('rules').querySelectorAll('.rule')].map(el => ({
+  const rules = [...$('rules').querySelectorAll('.rule')].map((el, i) => ({
     match: el.querySelector('.r-match').value.trim(),
     agent: el.querySelector('.r-agent').value,
-    parallel: el.querySelector('.r-par').checked,
+    parallel: !!(RULES[i] && RULES[i].parallel),
+    priority: RULES[i] ? RULES[i].priority : undefined,
+    enabled: el.querySelector('.r-en-box').checked,
   })).filter(r => r.match);
   await api('/api/roster/rules', {method:'POST', body: JSON.stringify({rules, chat: CHAT})});
   await refresh();

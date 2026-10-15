@@ -149,6 +149,20 @@ cd npm && npm publish
 - **2026-10-14** — Brain page visual restyle: plain list rows with dividers, no
   emoji, monospace identifiers, markdown rendering in Mentions/Ask, additive
   `mentions` count in `GET /api/entities`. Deployed to main; service restarted.
+- **2026-10-15** — Designer feedback wave on Inbox/Agents: Agents page header
+  repeat removed (slim refresh/filter row instead), heavy cards replaced with
+  flat sections, Members+Roster merged into one Team list with a per-row
+  action menu, rules as one-line rows with an `enabled` toggle (new
+  `task_rules.enabled` column; disabled rules skipped by auto-routing) and
+  "first match wins" note, roles/modes as dim text, 44px inputs/selects, task
+  submitters (`created_by`) now shown, palette #111214/#e6e4df/#d9a55b with
+  ≤4px radius and no pills/emoji/glows. Inbox: unread-only dots (green while
+  active <1h), note counts hidden on empty projects sorted last, agents popup
+  retitled "Send to agent" with member tags and roster agents included
+  (`GET /api/inbox/agents` now unions the roster). Designer added as roster
+  agent + worker on peers/orbit boards; designer connection notes in
+  `~/projects/llm-playground/gorkbot/designer-board-access.md`. Deployed to
+  main; service restarted.
 
 ## Self-host (Python)
 

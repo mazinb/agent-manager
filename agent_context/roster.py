@@ -71,7 +71,8 @@ def _ensure(con):
         "match TEXT NOT NULL,"
         "agent TEXT NOT NULL,"
         "parallel INTEGER NOT NULL DEFAULT 0,"
-        "priority INTEGER NOT NULL DEFAULT 0)"
+        "priority INTEGER NOT NULL DEFAULT 0,"
+        "enabled INTEGER NOT NULL DEFAULT 1)"
     )
     if "board_id" not in _cols(con, "tasks"):
         con.execute(
@@ -80,6 +81,10 @@ def _ensure(con):
         con.execute(
             "ALTER TABLE task_rules ADD COLUMN board_id "
             "INTEGER NOT NULL DEFAULT 0")
+    if "enabled" not in _cols(con, "task_rules"):
+        con.execute(
+            "ALTER TABLE task_rules ADD COLUMN enabled "
+            "INTEGER NOT NULL DEFAULT 1")
     con.commit()
 
     n = con.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
@@ -351,12 +356,14 @@ def list_rules(con, board_id=None, chat=None):
     _ensure(con)
     bid = _resolve_board_id(con, board_id=board_id, chat=chat)
     rows = con.execute(
-        "SELECT id, board_id, match, agent, parallel, priority FROM task_rules "
+        "SELECT id, board_id, match, agent, parallel, priority, enabled "
+        "FROM task_rules "
         "WHERE board_id=? ORDER BY priority DESC, id", (bid,)).fetchall()
     return [{
         "id": r["id"], "board_id": r["board_id"],
         "match": r["match"], "agent": r["agent"],
         "parallel": bool(r["parallel"]), "priority": r["priority"],
+        "enabled": bool(r["enabled"]),
     } for r in rows]
 
 
@@ -373,10 +380,11 @@ def set_rules(con, rules, board_id=None, chat=None):
         if not match or not agent:
             continue
         con.execute(
-            "INSERT INTO task_rules(board_id, match, agent, parallel, priority) "
-            "VALUES(?,?,?,?,?)",
+            "INSERT INTO task_rules(board_id, match, agent, parallel, "
+            "priority, enabled) VALUES(?,?,?,?,?,?)",
             (bid, match, agent, 1 if rule.get("parallel") else 0,
-             int(rule.get("priority", 10 - i))))
+             int(rule.get("priority", 10 - i)),
+             0 if rule.get("enabled") is False else 1))
     con.commit()
     return list_rules(con, board_id=bid)
 
@@ -384,6 +392,8 @@ def set_rules(con, rules, board_id=None, chat=None):
 def _apply_rule(con, board_id, title, body):
     text = f"{title}\n{body}".lower()
     for rule in list_rules(con, board_id=board_id):
+        if not rule.get("enabled", True):
+            continue
         if rule["match"].lower() in text:
             return rule["agent"], rule["parallel"]
     return "", None

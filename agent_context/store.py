@@ -355,7 +355,8 @@ def list_notes(con, project=None):
 
 def list_agents(con):
     """Distinct agent peers that have written or been messaged — feeds the
-    Grok-style agents menu overlay."""
+    Grok-style agents menu overlay. Roster agents without note traffic are
+    included too so every roster agent is selectable."""
     rows = con.execute(
         "SELECT agent AS name, COUNT(*) AS n FROM sources "
         "WHERE kind='note' AND agent != '' GROUP BY agent "
@@ -369,6 +370,12 @@ def list_agents(con):
         if not name:
             continue
         by[name] = by.get(name, 0) + r["n"]
+    try:
+        from . import roster
+        for a in roster.list_agents(con):
+            by.setdefault(a["name"], 0)
+    except Exception:
+        pass
     return [{"agent": k, "notes": by[k]} for k in sorted(by, key=lambda a: (-by[a], a))]
 
 
