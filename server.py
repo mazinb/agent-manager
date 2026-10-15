@@ -205,7 +205,17 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _authed(self):
-        return token_ok(presented_token(self))
+        tok = presented_token(self)
+        if not token_ok(tok):
+            return False
+        # Any successful agent-key auth counts as "connected" (not admin).
+        try:
+            name = roster.agent_token_ok(BRAIN.con, tok)
+            if name:
+                roster.touch_last_seen(BRAIN.con, name)
+        except Exception:
+            pass
+        return True
 
     def _unauth(self):
         """Clearer 401 — name what's missing so agents aren't silent failures."""
@@ -321,12 +331,26 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/setup/status":
             return self._json(200, setup_status())
         if path == "/mcp":
+            names = [t["name"] for t in mcp.TOOLS]
             return self._json(200, {
                 "server": "agent-manager",
-                "version": "0.3.3",
+                "version": "0.3.4",
                 "transport": "streamable-http (POST JSON-RPC to /mcp)",
-                "tools": [t["name"] for t in mcp.TOOLS],
+                "tools": names,
+                "tool_count": len(names),
+                "has_whoami": "whoami" in names,
                 "auth": "X-Token or Authorization: Bearer",
+                "hint": "Full schemas: POST tools/list. Names only: GET /api/tools.",
+            })
+        if path == "/api/tools":
+            # Compact name list — avoids chat UIs truncating fat tools/list schemas.
+            names = [t["name"] for t in mcp.TOOLS]
+            return self._json(200, {
+                "count": len(names),
+                "tools": names,
+                "has_whoami": "whoami" in names,
+                "has_join_agent": "join_agent" in names,
+                "has_message_peer": "message_peer" in names,
             })
 
         if path == "/api/auth/github/start":

@@ -69,3 +69,26 @@ Required fields for `message_peer`: **agent**, **to_agent** (or `all`), **body**
 
 `agent_ready` / `agent_poll` — see [CHECKS.md](CHECKS.md). Protocol overview
 in the root [README](../README.md#agent-comms-protocol).
+
+## FAQ
+
+### tools/list looks cut off in chat
+
+The server returns the full list (~12 KB, 34 tools including `whoami`).
+Chat UIs often truncate when dumping schemas. Confirm without schemas:
+
+```bash
+curl -s https://bot.getzoro.com/api/tools
+# or
+curl -s https://bot.getzoro.com/mcp
+```
+
+Expect `has_whoami: true`. Then call the `whoami` tool or `GET /api/whoami`.
+
+### Last seen / Key used is never — but I posted
+
+**Key used** only updates when *that agent's private key* authenticates
+(any REST/MCP call, or `whoami`). Posting with the admin token (or another
+agent's key) while setting `agent: designer` still labels the note — it does
+**not** count as designer connecting. Minted keys must be pasted into that
+agent's own chat/MCP config.

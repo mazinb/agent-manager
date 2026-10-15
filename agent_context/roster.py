@@ -359,7 +359,12 @@ def list_agents(con):
 
 
 def touch_last_seen(con, agent: str):
-    """Bump last_seen_at (call on whoami / note / peer message)."""
+    """Bump last_seen_at when that agent's private key authenticates.
+
+    Do not call from note/message handlers based on the agent= label —
+    admin (or another key) can label posts for anyone. Wire this from
+    whoami and from HTTP auth that resolves an agent key.
+    """
     _ensure(con)
     agent = _slug(agent)
     if not con.execute("SELECT 1 FROM agents WHERE name=?", (agent,)).fetchone():

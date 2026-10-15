@@ -97,12 +97,8 @@ def _note(brain, args):
                         based_on=based_on, origin=origin,
                         agent=agent or None, to_agent=to_agent or None)
     brain.con.commit()
-    if agent:
-        try:
-            from . import roster
-            roster.touch_last_seen(brain.con, agent)
-        except Exception:
-            pass
+    # last_seen bumps only on agent-key auth (server._authed / whoami),
+    # not on the agent= label — admin can label notes for anyone.
     out = {"ok": True, "project": project, "title": title}
     if agent:
         out["agent"] = store._slug_agent(agent)
@@ -223,11 +219,6 @@ def _message_peer(brain, args):
             raise ValueError("no other agents on the roster to broadcast to")
         sent = [_one(r, title_suffix=r) for r in recipients]
         brain.con.commit()
-        try:
-            from . import roster as _r
-            _r.touch_last_seen(brain.con, from_slug)
-        except Exception:
-            pass
         return {
             "ok": True, "project": project, "broadcast": True,
             "agent": from_slug,
@@ -239,11 +230,6 @@ def _message_peer(brain, args):
     to_slug = store._slug_agent(to_agent)
     one = _one(to_slug)
     brain.con.commit()
-    try:
-        from . import roster as _r
-        _r.touch_last_seen(brain.con, from_slug)
-    except Exception:
-        pass
     return {
         "ok": True, "project": project, "title": one["title"],
         "agent": from_slug, "to_agent": to_slug, "id": one["id"],

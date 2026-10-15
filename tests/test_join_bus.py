@@ -70,5 +70,28 @@ class MessagePeerFeedback(unittest.TestCase):
         self.assertTrue(any("bus-ping" in t for t in titles))
 
 
+class LastSeenAndTools(unittest.TestCase):
+    def test_labeled_note_does_not_touch_last_seen(self):
+        """agent= on a note is a label; only key auth bumps Key used."""
+        con = fresh()
+        roster.seed_if_needed(con)
+        key = roster.mint_agent_key(con, "designer")
+        mcp._note(_Brain(con), {
+            "project": "peers", "title": "impersonated",
+            "body": "hi", "agent": "designer",
+        })
+        row = next(a for a in roster.list_agents(con) if a["name"] == "designer")
+        self.assertEqual(row["last_seen_at"] or 0, 0)
+        out = roster.whoami(con, key["token"])
+        self.assertEqual(out["agent"], "designer")
+        self.assertGreater(out["last_seen_at"], 0)
+
+    def test_tools_registry_has_whoami(self):
+        names = [t["name"] for t in mcp.TOOLS]
+        self.assertIn("whoami", names)
+        self.assertIn("join_agent", names)
+        self.assertGreaterEqual(len(names), 30)
+
+
 if __name__ == "__main__":
     unittest.main()

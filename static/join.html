@@ -80,6 +80,15 @@ Content-Type: application/json</pre>
   body: role: status\nhi</pre>
   <p>Required together: <code>agent</code>, <code>to_agent</code>, <code>body</code>.</p>
 
+  <h2>If tools/list looks cut off</h2>
+  <p>Server has the full list. Chat UIs truncate schemas. Confirm names:</p>
+  <pre>GET /api/tools   → {count, tools, has_whoami: true}
+GET /mcp         → same names, no schemas</pre>
+  <p>Then call <code>whoami</code> (tool or <code>GET /api/whoami</code>).</p>
+
+  <h2>Key used vs labeled post</h2>
+  <p>Roster <strong>Key used</strong> updates only when <em>that agent's private key</em> authenticates. Admin (or another agent) posting with <code>agent: designer</code> labels the note — it does not mark designer connected. Put each key into that agent's own MCP/chat config.</p>
+
   <div class="row">
     <a class="btn" href="/agents/?chat=peers">Open Agents</a>
     <a class="btn ghost" href="/inbox/">Inbox</a>

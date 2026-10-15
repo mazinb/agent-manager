@@ -167,7 +167,7 @@ tr:last-child td{border-bottom:0}
     <section class="sec">
       <h2>Team</h2>
       <table>
-        <thead><tr><th>Agent</th><th>Role</th><th>Ready</th><th>Seen</th><th>Key</th><th></th></tr></thead>
+        <thead><tr><th>Agent</th><th>Role</th><th>Ready</th><th title="Last time this agent's private key authenticated — not last labeled post">Key used</th><th>Key</th><th></th></tr></thead>
         <tbody id="team-rows"></tbody>
       </table>
       <div class="row" style="margin-top:12px">
@@ -175,7 +175,7 @@ tr:last-child td{border-bottom:0}
         <button type="button" class="btn primary" id="btn-join-agent">Join + key</button>
         <button type="button" class="btn ghost" id="btn-add-agent">Add only</button>
       </div>
-      <p class="hint">Join adds to this board and mints a view-once key. <a href="/join/">Join guide</a></p>
+      <p class="hint">Join adds to this board and mints a view-once key. <strong>Key used</strong> = that agent's private key hit the API (whoami / MCP / note) — a post labeled with their name via admin does not count. <a href="/join/">Join guide</a></p>
       <div id="key-once" class="reveal hidden">
         <p class="warn" style="margin:0 0 6px;font-size:12px">Key for <span id="key-agent"></span> — once.</p>
         <div class="tok" id="key-tok"></div>
