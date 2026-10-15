@@ -167,7 +167,7 @@ tr:last-child td{border-bottom:0}
     <section class="sec">
       <h2>Team</h2>
       <table>
-        <thead><tr><th>Agent</th><th>Role</th><th>Mode</th><th>Key</th><th></th></tr></thead>
+        <thead><tr><th>Agent</th><th>Role</th><th>Mode</th><th>Ready</th><th>Key</th><th></th></tr></thead>
         <tbody id="team-rows"></tbody>
       </table>
       <div class="row" style="margin-top:12px">
@@ -219,6 +219,7 @@ const $ = id => document.getElementById(id);
 const KEY = 'am_token';
 let TOK = localStorage.getItem(KEY) || '';
 let AGENTS = [], TASKS = [], BRIEFS = [], BOARDS = [], BOARD = null;
+let READY = {}; // agent -> state
 let EDIT_AGENT = null;
 const params = new URLSearchParams(location.search);
 let CHAT = params.get('chat') || 'peers';
@@ -267,12 +268,14 @@ async function refresh(){
   BOARD = board;
   CHAT = board.chat || CHAT;
   const q = 'chat=' + encodeURIComponent(CHAT);
-  const [t, b] = await Promise.all([
+  const [t, b, r] = await Promise.all([
     api('/api/roster/tasks?' + q),
     api('/api/roster/briefs?' + q),
+    api('/api/roster/ready'),
   ]);
   TASKS = t.tasks || [];
   BRIEFS = b.briefs || [];
+  READY = Object.fromEntries((r.states || []).map(s => [s.agent, s]));
   renderBoards();
   renderTeam();
   renderTasks();
@@ -304,7 +307,7 @@ function renderTeam(){
     ...members.keys(),
   ]);
   if(!names.size){
-    $('team-rows').innerHTML = '<tr><td colspan="5" class="hint">No agents.</td></tr>';
+    $('team-rows').innerHTML = '<tr><td colspan="6" class="hint">No agents.</td></tr>';
     return;
   }
   const byName = new Map(AGENTS.map(a => [a.name, a]));
@@ -314,16 +317,27 @@ function renderTeam(){
     const role = m ? m.role : '';
     const key = a.has_key ? `set ····${esc(a.token_hint||'')}` : 'none';
     const mode = a.parallel_ok ? 'parallel' : 'serial';
+    const st = READY[n];
+    let readyTxt = '—';
+    let readyCls = 'dim-txt';
+    if(st && st.ready === true){ readyTxt = 'ok'; readyCls = 'status-txt done'; }
+    else if(st && st.ready === false){
+      const failed = ((st.results || {}).failed) || [];
+      readyTxt = failed.length ? failed.join(', ') : 'blocked';
+      readyCls = 'status-txt blocked';
+    }
     return `<tr>
       <td><span class="name">${esc(a.label)}</span>
         <div class="dim-txt" style="margin:0">${esc(n)}</div></td>
       <td><span class="role-txt">${esc(role || '—')}</span></td>
       <td><span class="mode-txt">${mode}</span></td>
+      <td><span class="${readyCls}">${esc(readyTxt)}</span></td>
       <td><span class="dim-txt">${key}</span></td>
       <td style="text-align:right;white-space:nowrap">
         <details class="menu">
           <summary aria-label="Actions">···</summary>
           <div class="menu-items">
+            <button type="button" class="btn ghost" data-check="${esc(n)}">Check now</button>
             <button type="button" class="btn ghost" data-key="${esc(n)}">Mint key</button>
             ${m
               ? `<button type="button" class="btn danger" data-rm="${esc(n)}">Remove from board</button>`
@@ -340,6 +354,15 @@ function renderTeam(){
       </td>
     </tr>`;
   }).join('');
+  $('team-rows').querySelectorAll('[data-check]').forEach(b => {
+    b.onclick = async () => {
+      b.closest('details').open = false;
+      try {
+        await api('/api/roster/ready', {method:'POST', body: JSON.stringify({agent: b.dataset.check})});
+        await refresh();
+      } catch(e){ alert(e.message); }
+    };
+  });
   $('team-rows').querySelectorAll('[data-key]').forEach(b => {
     b.onclick = () => { b.closest('details').open = false; mintKey(b.dataset.key); };
   });

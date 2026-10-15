@@ -407,6 +407,25 @@ TOOLS = [
          "chat": {"type": "string"}, "board_id": {"type": "integer"},
          "since_hashes": {"type": "object",
                           "description": "{agent: content_hash} from last pack"}}}},
+    {"name": "get_policy", "description": "Per-agent check policy: gates "
+     "(before work) and poll (periodic). Gates: brain, thermal, agent_manager.",
+     "inputSchema": {"type": "object", "properties": {
+         "agent": {"type": "string"}}, "required": ["agent"]}},
+    {"name": "set_policy", "description": "Set an agent's check policy. "
+     "Example: {gates:[\"brain\",\"thermal\"], poll:{every_min:5, "
+     "actions:[\"peer_inbox\"]}, on_fail:\"block\"}.",
+     "inputSchema": {"type": "object", "properties": {
+         "agent": {"type": "string"}, "policy": {"type": "object"}},
+         "required": ["agent", "policy"]}},
+    {"name": "agent_ready", "description": "Run configured gates before work. "
+     "Hermes should call this before claim_task / on-device jobs. Returns "
+     "ready/blocked + per-gate results.",
+     "inputSchema": {"type": "object", "properties": {
+         "agent": {"type": "string"}}, "required": ["agent"]}},
+    {"name": "agent_poll", "description": "Run periodic poll actions "
+     "(e.g. peer_inbox) then refresh gates. Call on the agent's poll.every_min.",
+     "inputSchema": {"type": "object", "properties": {
+         "agent": {"type": "string"}}, "required": ["agent"]}},
 ]
 
 
@@ -522,6 +541,27 @@ def _session_pack(brain, args):
         since_hashes=args.get("since_hashes"))
 
 
+def _get_policy(brain, args):
+    from . import checks
+    return checks.get_policy(brain.con, args.get("agent") or "")
+
+
+def _set_policy(brain, args):
+    from . import checks
+    return checks.set_policy(
+        brain.con, args.get("agent") or "", args.get("policy") or {})
+
+
+def _agent_ready(brain, args):
+    from . import checks
+    return checks.agent_ready(brain.con, args.get("agent") or "")
+
+
+def _agent_poll(brain, args):
+    from . import checks
+    return checks.agent_poll(brain.con, args.get("agent") or "")
+
+
 TOOL_FUNCS = {t["name"]: f for t, f in zip(
     TOOLS, [_search, _ask, _entity, _context_pack, _projects, _stats, _note,
             _add_note, _list_projects, _get_project_summary,
@@ -530,7 +570,8 @@ TOOL_FUNCS = {t["name"]: f for t, f in zip(
             _list_roster, _list_boards, _get_board, _add_board_member,
             _remove_board_member, _list_tasks, _add_task, _claim_task,
             _update_task, _list_briefs, _get_brief, _set_brief,
-            _session_pack])}
+            _session_pack, _get_policy, _set_policy, _agent_ready,
+            _agent_poll])}
 
 
 def handle(brain, msg):

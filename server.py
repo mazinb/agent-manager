@@ -26,7 +26,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from agent_context import github_login, llm, mcp, query, store  # noqa: E402
+from agent_context import checks, github_login, llm, mcp, query, store  # noqa: E402
 from agent_context import autonote, roster  # noqa: E402
 from agent_context.server import Brain  # noqa: E402
 
@@ -424,6 +424,25 @@ class Handler(BaseHTTPRequestHandler):
                     board_id=int(board_id) if board_id else None))
             except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
+        if path == "/api/roster/policies":
+            agent = (q.get("agent") or [None])[0]
+            try:
+                if agent:
+                    return self._json(200, checks.get_policy(BRAIN.con, agent))
+                return self._json(200, {"policies": checks.list_policies(BRAIN.con)})
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/ready":
+            agent = (q.get("agent") or [None])[0]
+            try:
+                if agent:
+                    # Live gate run when ?run=1, else last stored state.
+                    if (q.get("run") or ["0"])[0] in ("1", "true", "yes"):
+                        return self._json(200, checks.agent_ready(BRAIN.con, agent))
+                    return self._json(200, checks.get_state(BRAIN.con, agent))
+                return self._json(200, {"states": checks.list_states(BRAIN.con)})
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
         if path == "/api/inbox/messages":
             to_agent = (q.get("to") or q.get("to_agent") or [None])[0]
             agent = (q.get("from") or q.get("agent") or [None])[0]
@@ -542,7 +561,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/roster/board/members/remove",
             "/api/roster/tasks", "/api/roster/tasks/claim",
             "/api/roster/tasks/update", "/api/roster/rules",
-            "/api/roster/briefs",
+            "/api/roster/briefs", "/api/roster/policies",
+            "/api/roster/ready", "/api/roster/poll",
         ):
             return self._json(404, {"error": "not found"})
         if not self._authed():
@@ -648,6 +668,26 @@ class Handler(BaseHTTPRequestHandler):
                     payload.get("body") or "",
                     chat=payload.get("chat"),
                     board_id=int(bid) if bid not in (None, "") else None))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/policies":
+            try:
+                return self._json(200, checks.set_policy(
+                    BRAIN.con,
+                    payload.get("agent") or "",
+                    payload.get("policy") or {}))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/ready":
+            try:
+                return self._json(200, checks.agent_ready(
+                    BRAIN.con, payload.get("agent") or ""))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/roster/poll":
+            try:
+                return self._json(200, checks.agent_poll(
+                    BRAIN.con, payload.get("agent") or ""))
             except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
 

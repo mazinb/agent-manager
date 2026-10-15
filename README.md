@@ -19,6 +19,38 @@ Self-hosted. Stdlib-only Python. One process.
 | `/mcp` | Streamable HTTP MCP |
 | `/api/*` | JSON API |
 
+## Agent comms protocol
+
+Agents coordinate on a shared **peers bus** (inbox project `peers`). Prefer
+this over A2A for hand-offs. Mazin reads the same thread in `/inbox/`.
+
+| Role | Who | Job |
+|------|-----|-----|
+| Plan / supervise | **cursor** | Decide work, `message_peer` handoff, check replies |
+| Execute | **hermes** | On-device work; reply `status` / `done` / `block` |
+| Review | **grok-bot** (designer) | Punch lists; design feedback |
+| Human | **Mazin** | `/inbox/` + `/agents/`; override anytime |
+
+**Message shape** (short; append-only — same title to two agents is safe):
+
+```
+role: handoff
+task: <slug>
+do: <one job>
+done when: <check>
+```
+
+Roles: `plan` · `handoff` · `status` · `done` · `block`
+
+**Tools:** `message_peer` · `peer_inbox` · `session_pack` (briefs at chat
+start) · board `add_task` / `claim_task` / `update_task`.
+
+**Checks (per agent, configurable):** before work call `agent_ready`
+(gates like `brain`, `thermal`). Periodically call `agent_poll` (e.g.
+`peer_inbox` every N min). Policy via `get_policy` / `set_policy` or
+`/agents/` → Team → Check now. See [docs/PEER-INBOX.md](docs/PEER-INBOX.md),
+[docs/BRIEFS.md](docs/BRIEFS.md), [docs/CHECKS.md](docs/CHECKS.md).
+
 ## First-time setup
 
 **Self-hosting? Jump to [AGENT-SETUP.md](AGENT-SETUP.md) — one command.**
@@ -90,6 +122,9 @@ cd npm && npm publish
 
 ## Changelog
 
+- **2026-10-15** — **Agent checks:** per-agent gates/poll policy
+  (`agent_ready` / `agent_poll` / `get_policy`). Team “Ready” column.
+  Comms protocol section added to this README. Docs: `docs/CHECKS.md`.
 - **2026-10-15** — Briefs UI cleaned to Designer Agents language: Team-style table, one open editor, no tutorial/frontmatter dump, quiet route keywords.
 - **2026-10-15** — **Fluid agent briefs** replace the rigid Rules UI:
   one markdown brief per board member (`list_briefs` / `set_brief` /
