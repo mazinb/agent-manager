@@ -174,15 +174,24 @@ def presented_token(handler) -> str:
     return ""
 
 
+def token_row(token: str):
+    """Return the tokens.json row for a dashboard token, or None."""
+    if not token:
+        return None
+    digest = hash_token(token)
+    for row in load_tokens():
+        if secrets.compare_digest(row.get("hash", ""), digest):
+            return row
+    return None
+
+
 def token_ok(token: str) -> bool:
     if not token:
         return False
     if ADMIN_TOKEN and secrets.compare_digest(token, ADMIN_TOKEN):
         return True
-    digest = hash_token(token)
-    for row in load_tokens():
-        if secrets.compare_digest(row.get("hash", ""), digest):
-            return True
+    if token_row(token):
+        return True
     # Per-agent keys (roster)
     try:
         if store.roster_token_ok(BRAIN.con, token):
@@ -190,6 +199,43 @@ def token_ok(token: str) -> bool:
     except Exception:
         pass
     return False
+
+
+def dashboard_whoami(token: str) -> dict | None:
+    """Identity for signup / GitHub / pasted UI tokens (not agent keys).
+
+    These pass token_ok and unlock Brain/Inbox, but roster.whoami only knows
+    admin + agent keys — without this the Agents page stays gated forever.
+    """
+    row = token_row(token)
+    if not row:
+        return None
+    boards = [{"chat": b["chat"], "role": "viewer"}
+              for b in roster.list_boards(BRAIN.con)]
+    return {
+        "admin": False,
+        "key_ok": True,
+        "agent": None,
+        "user": True,
+        "host": False,
+        "hosted_chat": None,
+        "label": row.get("label") or "user",
+        "role": row.get("role") or "user",
+        "boards": boards,
+        "message": "dashboard token",
+    }
+
+
+# Optional post-OAuth landing path keyed by GitHub OAuth state.
+_GITHUB_NEXT: dict[str, str] = {}
+
+
+def _safe_next(path: str) -> str:
+    """Only allow same-origin relative paths (no protocol-relative / open redirect)."""
+    path = (path or "").strip() or "/brain/"
+    if not path.startswith("/") or path.startswith("//") or "://" in path:
+        return "/brain/"
+    return path
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -379,6 +425,8 @@ class Handler(BaseHTTPRequestHandler):
                     or f"https://{host}").rstrip("/")
             redirect_uri = base + "/api/auth/github/callback"
             state = github_login.new_state()
+            nxt = _safe_next((q.get("next") or ["/brain/"])[0])
+            _GITHUB_NEXT[state] = nxt
             url = github_login.build_authorize_url(
                 ENV["GITHUB_CLIENT_ID"], redirect_uri, state)
             return self._redirect(url)
@@ -386,23 +434,29 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/auth/github/callback":
             qs2 = {k: v[0] for k, v in
                    parse_qs(urlparse(self.path).query).items()}
+            state = qs2.get("state", "")
+            nxt = _safe_next(_GITHUB_NEXT.pop(state, "/brain/"))
             try:
                 login = github_login.complete(
-                    qs2.get("code", ""), qs2.get("state", ""), ENV)
+                    qs2.get("code", ""), state, ENV)
             except github_login.GitHubError as e:
                 return self._json(400, {"error": str(e)})
             raw, _row = create_token(f"github:{login}", role="user")
             return self._html_page(
                 "Signed in as " + login,
                 f"localStorage.setItem('am_token', {json.dumps(raw)});"
-                "location.href = '/brain/';")
+                f"location.href = {json.dumps(nxt)};")
 
         if path == "/api/whoami":
-            # Identity check — works with agent keys; clear hint on failure.
+            # Identity check — agent keys, admin, or dashboard (tokens.json).
+            tok = presented_token(self)
             try:
                 return self._json(200, roster.whoami(
-                    BRAIN.con, presented_token(self), ADMIN_TOKEN or ""))
+                    BRAIN.con, tok, ADMIN_TOKEN or ""))
             except ValueError as e:
+                dash = dashboard_whoami(tok)
+                if dash:
+                    return self._json(200, dash)
                 return self._json(401, {"error": "unauthorized",
                                         "hint": str(e)})
 

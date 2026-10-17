@@ -137,11 +137,13 @@ tr:last-child td{border-bottom:0}
       <span class="spacer"></span>
       <button type="button" class="btn primary" id="btn-create">Create</button>
       <button type="button" class="btn ghost" id="btn-paste-toggle">Paste</button>
+      <a class="btn ghost hidden" id="btn-github" href="/api/auth/github/start?next=/agents/">GitHub</a>
     </div>
     <div id="paste-box" class="hidden" style="margin-top:10px">
       <input id="paste" type="password" placeholder="Paste token">
       <div class="actions"><button type="button" class="btn primary" id="btn-save-paste">Save</button></div>
     </div>
+    <p class="hint warn hidden" id="gate-err" style="margin-top:10px"></p>
     <div id="once" class="reveal hidden">
       <p class="warn" style="margin:0 0 6px;font-size:12px">Copy now — once.</p>
       <div class="tok" id="once-tok"></div>
@@ -265,13 +267,26 @@ function showApp(on){
   $('app').classList.toggle('hidden', !on);
 }
 
+function setGateErr(msg){
+  const el = $('gate-err');
+  if(!msg){ el.classList.add('hidden'); el.textContent = ''; return; }
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
 async function boot(){
+  setGateErr('');
+  try {
+    const s = await fetch('/api/setup/status').then(r => r.json());
+    if(s.oauth && s.oauth.github) $('btn-github').classList.remove('hidden');
+  } catch (_) { /* status is optional */ }
   if(!TOK){ showApp(false); return; }
   try {
     await refresh();
     showApp(true);
-  } catch {
+  } catch (e) {
     showApp(false);
+    setGateErr(e.message || 'Token rejected — paste a valid agent key or dashboard token.');
   }
 }
 
@@ -731,7 +746,7 @@ $('btn-copy-tok').onclick = ev => copy($('once-tok').textContent, ev.currentTarg
 $('btn-paste-toggle').onclick = () => $('paste-box').classList.toggle('hidden');
 $('btn-save-paste').onclick = async () => {
   TOK = $('paste').value.trim();
-  if(!TOK) return;
+  if(!TOK){ setGateErr('Paste a token first.'); return; }
   localStorage.setItem(KEY, TOK);
   await boot();
 };

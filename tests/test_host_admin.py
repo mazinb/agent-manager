@@ -172,3 +172,34 @@ class ServerGate(unittest.TestCase):
                         lambda _h, t=tok: t):  # noqa: B008 — deliberate bind
                     self.assertEqual(h._is_host(), is_host, tok)
                     self.assertEqual(h._is_bootstrap_admin(), is_boot, tok)
+
+    def test_dashboard_whoami_unlocks_agents_gate(self):
+        """Signup/GitHub tokens pass token_ok but fail roster.whoami.
+
+        Agents UI boot() calls /api/whoami first — without a dashboard
+        identity the page stays gated even though roster GETs succeed.
+        """
+        con = fresh()
+        roster.seed_if_needed(con)
+        srv = self.server
+        td = tempfile.mkdtemp()
+        path = os.path.join(td, "tokens.json")
+        with mock.patch.object(srv, "BRAIN", _Brain(con)), \
+                mock.patch.object(srv, "TOKENS_PATH", path), \
+                mock.patch.object(srv, "ADMIN_TOKEN", "boot-token"):
+            raw, row = srv.create_token("github:octocat", role="user")
+            self.assertEqual(row["label"], "github:octocat")
+            with self.assertRaises(ValueError):
+                roster.whoami(con, raw, "boot-token")
+            self.assertTrue(srv.token_ok(raw))
+            dash = srv.dashboard_whoami(raw)
+            self.assertIsNotNone(dash)
+            self.assertTrue(dash["user"])
+            self.assertTrue(dash["key_ok"])
+            self.assertFalse(dash["admin"])
+            self.assertIsNone(dash["agent"])
+            self.assertEqual(dash["label"], "github:octocat")
+            self.assertIsNone(srv.dashboard_whoami("not-a-token"))
+            self.assertEqual(srv._safe_next("/agents/"), "/agents/")
+            self.assertEqual(srv._safe_next("https://evil"), "/brain/")
+            self.assertEqual(srv._safe_next("//evil"), "/brain/")
