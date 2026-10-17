@@ -7,12 +7,21 @@ The `agent-manager` MCP server is this workspace's shared brain. Prefer it over 
 
 Setup UI: `{brain}/connect/` · Brain UI: `{brain}/brain/` · MCP: `{brain}/mcp`
 
+## Session bootstrap (do this first in a new chat)
+If MCP `initialize` did not already inject packs (or you are mid-session and briefs may have changed), call **`session_bootstrap`** once:
+
+- With roster/peers: loads `session_pack(chat=peers)`.
+- With a project pin (`?project=` / connect `--project`): also loads `context_pack`.
+- Pass `since_hashes` + `context_hash` from the last bootstrap to skip unchanged injects.
+
+Connect CLI (`npx agent-manager-brain connect|bootstrap --project …`) does this automatically and persists hashes under `~/.agent-manager/bootstrap-state.json`.
+
 ## Recall
 Before acting on something that may have prior context (a past decision, convention, or earlier problem), query the brain instead of guessing:
 
 - `ask` for a synthesized, cited answer.
 - `search` for matching chunks / notes.
-- `context_pack` with `project` set to the current repo/project slug when you need an injectable pack.
+- `context_pack` / `session_bootstrap` with `project` set to the current repo/project slug when you need an injectable pack.
 - `entity` when you have a concrete name (service, port, model, person).
 - `projects` / `stats` to see what the brain already holds.
 

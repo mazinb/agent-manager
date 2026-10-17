@@ -495,6 +495,23 @@ class Handler(BaseHTTPRequestHandler):
                     board_id=int(board_id) if board_id else None))
             except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
+        if path == "/api/session/bootstrap":
+            # Session start: session_pack + optional context_pack (?project=).
+            from agent_context import bootstrap
+            try:
+                return self._json(200, bootstrap.session_bootstrap(
+                    BRAIN.con,
+                    project=(q.get("project") or [None])[0],
+                    chat=(q.get("chat") or [None])[0] or "peers",
+                    since_hashes=None,
+                    context_hash=(q.get("context_hash") or [None])[0],
+                    include_session=(q.get("session") or ["1"])[0]
+                    not in ("0", "false", "no"),
+                    include_context=(q.get("context") or ["1"])[0]
+                    not in ("0", "false", "no"),
+                ))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
         if path == "/api/roster/policies":
             agent = (q.get("agent") or [None])[0]
             try:
@@ -627,6 +644,7 @@ class Handler(BaseHTTPRequestHandler):
         if path not in (
             "/api/ask", "/api/refresh", "/api/note",
             "/api/project/visibility", "/mcp",
+            "/api/session/bootstrap",
             "/api/roster/agents", "/api/roster/agents/key",
             "/api/roster/boards", "/api/roster/board/members",
             "/api/roster/board/members/remove",
@@ -857,18 +875,46 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, TypeError) as e:
                 return self._json(400, {"error": str(e)})
 
+        if path == "/api/session/bootstrap":
+            from agent_context import bootstrap
+            try:
+                return self._json(200, bootstrap.session_bootstrap(
+                    BRAIN.con,
+                    project=payload.get("project"),
+                    chat=payload.get("chat") or "peers",
+                    since_hashes=payload.get("since_hashes"),
+                    context_hash=payload.get("context_hash"),
+                    include_session=False if payload.get("include_session")
+                    is False else True,
+                    include_context=False if payload.get("include_context")
+                    is False else True,
+                    max_context_chars=int(payload.get("max_chars") or 6000),
+                ))
+            except (ValueError, TypeError) as e:
+                return self._json(400, {"error": str(e)})
+
         if path == "/mcp":
             # ?project=X on the MCP URL pins a default project for search/ask
             # (connect --project X writes this into the client's MCP config)
             qs = {k: v[0] for k, v in
                   parse_qs(urlparse(self.path).query).items()}
+            pin = qs.get("project")
+            # Client-persisted hashes: X-Bootstrap-Hashes: {"session":{…},"context":"…"}
+            boot_state = None
+            raw_bh = self.headers.get("X-Bootstrap-Hashes") or ""
+            if raw_bh.strip():
+                try:
+                    boot_state = json.loads(raw_bh)
+                except Exception:
+                    boot_state = None
             if payload.get("method") == "tools/call":
                 tname = (payload.get("params") or {}).get("name")
                 args = payload["params"].setdefault("arguments", {}) or {}
                 payload["params"]["arguments"] = args
-                if tname in ("search", "ask") and qs.get("project"):
+                if tname in ("search", "ask", "context_pack",
+                             "session_bootstrap") and pin:
                     if not args.get("project"):
-                        args["project"] = qs["project"]
+                        args["project"] = pin
                 # Inject caller identity from X-Token for host/mint tools.
                 tok = presented_token(self)
                 caller = roster.agent_token_ok(BRAIN.con, tok) if tok else None
@@ -887,7 +933,8 @@ class Handler(BaseHTTPRequestHandler):
                                        "(or admin) can invite",
                         },
                     })
-            resp = mcp.handle(BRAIN, payload)
+            resp = mcp.handle(
+                BRAIN, payload, project=pin, bootstrap_state=boot_state)
             if resp is None:
                 return self._json(202, {})
             return self._json(200, resp)

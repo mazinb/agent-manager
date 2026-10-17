@@ -239,7 +239,7 @@ async function setupCmd(args) {
   } catch (e) { console.log(`skipped (${e.message})`); }
 
   if (args.agent) {
-    connect({ ...args, url: base, token: tok });
+    await connect({ ...args, url: base, token: tok });
   } else {
     console.log(`\nConnect your agent:\n  npx agent-manager-brain connect --url ${base} --token ${tok} --agent cursor\n`);
   }
@@ -258,7 +258,114 @@ function stopCmd(args) {
   fs.unlinkSync(pidPath);
 }
 
-function connect(args) {
+function statePath() {
+  return path.join(os.homedir(), ".agent-manager", "bootstrap-state.json");
+}
+
+function injectPath() {
+  return path.join(os.homedir(), ".cursor", "rules", "agent-manager-bootstrap.mdc");
+}
+
+function loadBootstrapState() {
+  return readJson(statePath());
+}
+
+function saveBootstrapState(state) {
+  writeJson(statePath(), state);
+}
+
+/** Persist hashes client-side; rewrite inject rule only when packs changed. */
+async function runBootstrap(base, token, args) {
+  const prev = loadBootstrapState();
+  const since = (prev.hashes && prev.hashes.session) || {};
+  const contextHash = (prev.hashes && prev.hashes.context) || undefined;
+  const project = args.project || prev.project || undefined;
+  const chat = args.chat || prev.chat || "peers";
+  const body = {
+    project: project || null,
+    chat,
+    since_hashes: since,
+    context_hash: contextHash || null,
+    include_session: args["no-session"] ? false : true,
+    include_context: args["no-context"] ? false : true,
+  };
+  let result;
+  try {
+    result = await api(base, token, "POST", "/api/session/bootstrap", body);
+  } catch (e) {
+    // Older brains may lack the endpoint — fall back to session-pack + context.
+    const session = await api(base, token, "GET",
+      "/api/roster/session-pack?chat=" + encodeURIComponent(chat)).catch(() => null);
+    let context = null;
+    if (project) {
+      try {
+        const pack = await api(base, token, "GET",
+          "/api/context?project=" + encodeURIComponent(project));
+        const crypto = require("crypto");
+        const digest = crypto.createHash("sha256")
+          .update(pack.pack || "", "utf8").digest("hex");
+        context = { project, pack: pack.pack, content_hash: digest };
+      } catch {}
+    }
+    const parts = [];
+    if (session && session.pack) parts.push(session.pack);
+    if (context && context.pack) parts.push("# Context pack — " + project + "\n\n" + context.pack);
+    const ctxDigest = (context && context.content_hash) || null;
+    const ctxUnchanged = !!(contextHash && ctxDigest && contextHash === ctxDigest);
+    result = {
+      ok: true,
+      chat,
+      project: project || null,
+      instructions: "# Agent-manager session bootstrap\n\n" + (parts.join("\n") || "_(no packs)_") + "\n",
+      session,
+      context,
+      hashes: {
+        session: (session && session.hashes) || {},
+        context: ctxDigest,
+        chat,
+        project: project || null,
+      },
+      changed: !(ctxUnchanged && session && Object.keys(since).length),
+      skipped: { fallback: e.message, ...(ctxUnchanged ? { context: "unchanged" } : {}) },
+      chars: 0,
+    };
+    result.chars = result.instructions.length;
+  }
+
+  const next = {
+    url: base,
+    agent: args.agent || prev.agent || "",
+    chat: result.chat || chat,
+    project: result.project || project || null,
+    hashes: {
+      session: Object.assign({}, since, (result.hashes && result.hashes.session) || {}),
+      context: (result.hashes && result.hashes.context) || contextHash || null,
+    },
+    last_chars: result.chars,
+    last_changed: !!result.changed,
+  };
+  saveBootstrapState(next);
+
+  if (result.changed || !fs.existsSync(injectPath())) {
+    const bodyMd = [
+      "---",
+      "description: Auto-injected agent-manager session/context packs (connect bootstrap).",
+      "alwaysApply: true",
+      "---",
+      "",
+      result.instructions || "",
+      "",
+    ].join("\n");
+    fs.mkdirSync(path.dirname(injectPath()), { recursive: true });
+    fs.writeFileSync(injectPath(), bodyMd);
+    console.log(`wrote ${injectPath()} (${result.chars || bodyMd.length} chars)`);
+  } else {
+    console.log("bootstrap packs unchanged — skipped re-inject (hashes match)");
+  }
+  return result;
+}
+
+async function connect(args) {
   const base = requireBase(args);
   // ?project=X pins a default project for search/ask calls through this MCP URL
   const url = base + "/mcp" +
@@ -275,6 +382,10 @@ function connect(args) {
       { stdio: "inherit" });
     if (r.status === 0) {
       console.log(`\nAdded ${name} to Claude Code.`);
+      if (!args["no-bootstrap"] && token) {
+        try { await runBootstrap(base, token, args); }
+        catch (e) { console.error("bootstrap skipped: " + e.message); }
+      }
       return;
     }
     console.error("claude CLI not available — printing generic config.\n");
@@ -287,6 +398,10 @@ function connect(args) {
     cur.mcpServers = { ...(cur.mcpServers || {}), [name]: mcpEntry(url, token) };
     writeJson(file, cur);
     console.log("Restart Cursor to load it.");
+    if (!args["no-bootstrap"] && token) {
+      try { await runBootstrap(base, token, args); }
+      catch (e) { console.error("bootstrap skipped: " + e.message); }
+    }
     return;
   }
 
@@ -303,19 +418,13 @@ function connect(args) {
     };
     writeJson(file, cur);
     console.log("Reload VS Code / Copilot to load it.");
-    return;
-  }
-
-  if (agent === "windsurf") {
+  } else if (agent === "windsurf") {
     const file = path.join(os.homedir(), ".codeium", "windsurf", "mcp_config.json");
     const cur = readJson(file);
     cur.mcpServers = { ...(cur.mcpServers || {}), [name]: mcpEntry(url, token) };
     writeJson(file, cur);
     console.log("Reload Windsurf to load it.");
-    return;
-  }
-
-  if (agent === "cline") {
+  } else if (agent === "cline") {
     const candidates = [
       path.join(os.homedir(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings", "cline_mcp_settings.json"),
       path.join(os.homedir(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings", "cline_mcp_settings.json"),
@@ -326,10 +435,7 @@ function connect(args) {
     cur.mcpServers = { ...(cur.mcpServers || {}), [name]: mcpEntry(url, token) };
     writeJson(file, cur);
     console.log("Enable agent-manager inside Cline if it is not already on.");
-    return;
-  }
-
-  if (agent === "continue") {
+  } else if (agent === "continue") {
     const file = path.join(os.homedir(), ".continue", "config.yaml");
     fs.mkdirSync(path.dirname(file), { recursive: true });
     let text = "";
@@ -350,27 +456,44 @@ function connect(args) {
       console.log(`wrote ${file}`);
     }
     console.log("Reload the Continue extension.");
-    return;
-  }
-
-  if (agent === "zed") {
+  } else if (agent === "zed") {
     console.log("\nMerge this into Zed settings.json:\n");
     console.log(JSON.stringify({
       context_servers: {
         [name]: token ? { url, headers: { "X-Token": token } } : { url },
       },
     }, null, 2));
-    return;
+  } else if (agent !== "cursor" && agent !== "claude") {
+    printGeneric(url, token, name);
   }
 
-  printGeneric(url, token, name);
+  if (!args["no-bootstrap"] && token && agent !== "cursor" && agent !== "claude") {
+    // cursor/claude already bootstrapped above before return
+    try { await runBootstrap(base, token, args); }
+    catch (e) { console.error("bootstrap skipped: " + e.message); }
+  }
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const cmd = args._[0] || "help";
   try {
-    if (cmd === "connect") return connect(args);
+    if (cmd === "connect") return await connect(args);
+    if (cmd === "bootstrap") {
+      const base = requireBase(args);
+      const token = args.token || TOKEN;
+      if (!token) {
+        console.error("bootstrap needs --token or AGENT_MANAGER_TOKEN");
+        process.exit(1);
+      }
+      const result = await runBootstrap(base, token, args);
+      console.log(JSON.stringify({
+        ok: result.ok, changed: result.changed, skipped: result.skipped,
+        chat: result.chat, project: result.project, chars: result.chars,
+        hashes: result.hashes,
+      }, null, 2));
+      return;
+    }
     if (cmd === "init") return initCmd(args);
     if (cmd === "serve") return serveCmd(args);
     if (cmd === "setup") return await setupCmd(args);
@@ -416,8 +539,13 @@ const __doc = `agent-manager-brain — shared brain for any coding agent
 
   connect  --url https://host --token TOK --agent <platform>
            [--project X]  pin a default project for search/ask via ?project=
+           [--no-bootstrap]  skip auto session_pack/context_pack inject
            platforms: cursor claude vscode copilot windsurf cline
                       continue zed codex gemini generic
+  bootstrap --url https://host --token TOK [--project X] [--chat peers]
+           Fetch session_pack + context_pack; persist hashes under
+           ~/.agent-manager/bootstrap-state.json; rewrite
+           ~/.cursor/rules/agent-manager-bootstrap.mdc only when changed
   setup    [--agent X] [--port 8075] [--dir DIR] [--token TOK]
            ONE COMMAND self-host: clone + config + start server
            (background) + ingest + connect an agent
