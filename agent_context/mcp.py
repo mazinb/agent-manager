@@ -439,6 +439,23 @@ TOOLS = [
          "chat": {"type": "string"}, "board_id": {"type": "integer"},
          "since_hashes": {"type": "object",
                           "description": "{agent: content_hash} from last pack"}}}},
+    {"name": "session_bootstrap", "description": "Session start hook: auto-load "
+     "session_pack (peers briefs) and/or context_pack for a pinned project. "
+     "Pass since_hashes + context_hash from the last call to skip unchanged "
+     "injects. Prefer this (or MCP initialize instructions) over hoping the "
+     "model remembers to call packs.",
+     "inputSchema": {"type": "object", "properties": {
+         "project": {"type": "string",
+                     "description": "Project slug for context_pack; "
+                                    "defaults to MCP ?project= pin when set."},
+         "chat": {"type": "string", "default": "peers"},
+         "since_hashes": {"type": "object",
+                          "description": "{agent: content_hash} from last pack"},
+         "context_hash": {"type": "string",
+                          "description": "SHA-256 of last context_pack text"},
+         "include_session": {"type": "boolean", "default": True},
+         "include_context": {"type": "boolean", "default": True},
+         "max_chars": {"type": "integer", "default": 6000}}}},
     {"name": "get_policy", "description": "Per-agent check policy: gates "
      "(before work) and poll (periodic). Gates: brain, thermal, agent_manager.",
      "inputSchema": {"type": "object", "properties": {
@@ -624,6 +641,19 @@ def _session_pack(brain, args):
         since_hashes=args.get("since_hashes"))
 
 
+def _session_bootstrap(brain, args):
+    from . import bootstrap
+    return bootstrap.session_bootstrap(
+        brain.con,
+        project=args.get("project"),
+        chat=args.get("chat"),
+        since_hashes=args.get("since_hashes"),
+        context_hash=args.get("context_hash"),
+        include_session=False if args.get("include_session") is False else True,
+        include_context=False if args.get("include_context") is False else True,
+        max_context_chars=int(args.get("max_chars") or 6000))
+
+
 def _get_policy(brain, args):
     from . import checks
     return checks.get_policy(brain.con, args.get("agent") or "")
@@ -731,13 +761,22 @@ TOOL_FUNCS = {t["name"]: f for t, f in zip(
             _list_roster, _list_boards, _get_board, _add_board_member,
             _remove_board_member, _list_tasks, _add_task, _claim_task,
             _update_task, _list_briefs, _get_brief, _set_brief,
-            _session_pack, _get_policy, _set_policy, _agent_ready,
-            _agent_poll, _board_tick, _reassign_task, _whoami, _join_agent,
-            _create_board, _mint_key])}
+            _session_pack, _session_bootstrap, _get_policy, _set_policy,
+            _agent_ready, _agent_poll, _board_tick, _reassign_task, _whoami,
+            _join_agent, _create_board, _mint_key])}
 
 
-def handle(brain, msg):
-    """Handle one JSON-RPC message. Returns a response dict, or None for notifications."""
+def handle(brain, msg, *, project=None, bootstrap_state=None,
+           auto_bootstrap=True):
+    """Handle one JSON-RPC message. Returns a response dict, or None for notifications.
+
+    ``project`` — MCP URL ``?project=`` pin (also used for initialize instructions).
+    ``bootstrap_state`` — optional client hashes ``{session, context}`` from
+    ``X-Bootstrap-Hashes`` / prior inject, used to skip unchanged packs.
+    ``auto_bootstrap`` — when True, ``initialize`` includes pack instructions
+    and the first ``tools/call`` in a cold session can attach a bootstrap
+    preface (via ``_first_tool_bootstrap`` marker on the result meta).
+    """
     method = msg.get("method", "")
     rid = msg.get("id")
 
@@ -748,10 +787,38 @@ def handle(brain, msg):
     if method.startswith("notifications/"):
         return None
     if method == "initialize":
-        return {"jsonrpc": "2.0", "id": rid, "result": {
+        result = {
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "agent-context", "version": __version__}}}
+            "serverInfo": {"name": "agent-context", "version": __version__},
+        }
+        if auto_bootstrap:
+            # Always try session briefs; context_pack only when project pinned.
+            try:
+                from . import bootstrap
+                state = bootstrap_state if isinstance(bootstrap_state, dict) else {}
+                since, ctx_hash = bootstrap.hashes_from_state(state)
+                boot = bootstrap.session_bootstrap(
+                    brain.con,
+                    project=project,
+                    chat=state.get("chat") or "peers",
+                    since_hashes=since,
+                    context_hash=ctx_hash,
+                    include_session=True,
+                    include_context=bool(project),
+                )
+                result["instructions"] = boot["instructions"]
+                # Non-standard hint for clients that persist hashes.
+                result["_bootstrap_hashes"] = boot["hashes"]
+                result["_bootstrap_changed"] = boot["changed"]
+            except Exception as e:  # never fail initialize
+                result["instructions"] = (
+                    "# Agent-manager session bootstrap\n\n"
+                    f"_(bootstrap deferred: {e}). Call tool "
+                    f"`session_bootstrap`"
+                    + (f" with project={project!r}" if project else "")
+                    + " at chat start._\n")
+        return {"jsonrpc": "2.0", "id": rid, "result": result}
     if method == "ping":
         return {"jsonrpc": "2.0", "id": rid, "result": {}}
     if method == "tools/list":

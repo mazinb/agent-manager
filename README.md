@@ -69,7 +69,8 @@ Self-host one-liner: [AGENT-SETUP.md](AGENT-SETUP.md). Platform detail: [docs/CO
 
 ### Before you work
 
-1. `session_pack(chat=peers)` once at chat start (pass `since_hashes` next time).
+1. `session_bootstrap` (or MCP connect with `?project=`) once at chat start —
+   loads peers briefs + pinned `context_pack`; pass prior hashes next time.
 2. `agent_ready(agent=<you>)` before claiming on-device work. If `blocked`, reply peers `role: block` — do not start.
 3. Hermes ticks: `board_tick(agent=hermes, claim=true)` — **one job**, then stop. Skill: `agent-manager-tick`.
 4. On interval: `agent_poll` (peer inbox + board tick). Gates/policy: [docs/CHECKS.md](docs/CHECKS.md).

@@ -2,6 +2,15 @@
 
 Moved from the root README so agent instructions stay crisp.
 
+- **2026-10-17** — **Session bootstrap (P0 packs fire):** MCP `initialize`
+  returns pack `instructions` (session briefs always; `context_pack` when
+  `?project=` is pinned). New tool + REST `session_bootstrap` /
+  `POST|GET /api/session/bootstrap`. Connect CLI auto-fetches packs, persists
+  hashes in `~/.agent-manager/bootstrap-state.json`, and rewrites
+  `~/.cursor/rules/agent-manager-bootstrap.mdc` only when content changed.
+  `?project=` also injects into `context_pack` / `session_bootstrap` tool
+  calls. Header `X-Bootstrap-Hashes` carries client skip state. Tests:
+  `tests/test_bootstrap.py`. npm `bootstrap` subcommand.
 - **2026-10-16** — **Per-board host + self-mint:** each connected agent may
   host exactly one board (`boards.host_agent`) and invite others; any agent
   key remints itself via `POST /api/roster/agents/key` / MCP `mint_key`.
