@@ -60,3 +60,7 @@ You execute on-device work…
 `session_pack` · `join_agent`
 
 Cursor plans → `add_task(chat=…)` → Hermes `claim_task` → `update_task(done)`.
+
+Phone (Mac mini only): remote agents call `request_phone` (or
+`add_task` with `on-device:`) → Hermes on the mini runs `phone-harness`
+locally. Hosted MCP never proxies taps — see [PHONE-HARNESS.md](PHONE-HARNESS.md).

@@ -474,6 +474,25 @@ TOOLS = [
          "by": {"type": "string"},
          "reopen": {"type": "boolean", "default": True}},
          "required": ["id", "to_agent"]}},
+    {"name": "request_phone", "description": "Queue on-device iPhone work for "
+     "Mac mini Hermes. Does NOT execute taps — creates a peers board task "
+     "(on-device:) assigned to hermes; Hermes runs phone-harness locally after "
+     "board_tick. Remote agents use this instead of calling phone-harness.",
+     "inputSchema": {"type": "object", "properties": {
+         "do": {"type": "string",
+                "description": "One phone job (taps/OCR/OTP read/app nav)."},
+         "done_when": {"type": "string",
+                       "description": "Success check Hermes should report."},
+         "title": {"type": "string",
+                   "description": "Short slug; defaults from do."},
+         "from_agent": {"type": "string",
+                        "description": "Your agent name (created_by + handoff)."},
+         "assignee": {"type": "string", "default": "hermes",
+                      "description": "Mac executor (default hermes)."},
+         "chat": {"type": "string", "default": "peers"},
+         "notify": {"type": "boolean", "default": True,
+                    "description": "Also peer-handoff to assignee."}},
+         "required": ["do"]}},
     {"name": "whoami", "description": "Identity check for the calling key. "
      "Pass the same X-Token you use for MCP. Returns agent name, boards, "
      "key_ok. Prefer GET /api/whoami with your agent key.",
@@ -662,6 +681,52 @@ def _reassign_task(brain, args):
         reopen=False if args.get("reopen") is False else True)
 
 
+def _request_phone(brain, args):
+    """Register phone work for Mac Hermes — never executes device ops."""
+    from . import roster
+    job = (args.get("do") or args.get("body") or "").strip()
+    if not job:
+        raise ValueError("do required (one phone job)")
+    done_when = (args.get("done_when") or "").strip()
+    from_agent = (args.get("from_agent") or args.get("agent")
+                  or args.get("created_by") or "mcp").strip()
+    assignee = (args.get("assignee") or "hermes").strip() or "hermes"
+    chat = (args.get("chat") or "peers").strip() or "peers"
+    notify = False if args.get("notify") is False else True
+    slug = (args.get("title") or "").strip()
+    if not slug:
+        slug = re.sub(r"\s+", "-", job.lower())[:60].strip("-") or "phone-job"
+    title = slug if slug.lower().startswith("on-device") else f"on-device: {slug}"
+    body_parts = [f"do: {job}"]
+    if done_when:
+        body_parts.append(f"done when: {done_when}")
+    body_parts.append(
+        "exec: Mac mini phone-harness only (hosted MCP does not tap).")
+    task = roster.add_task(
+        brain.con, title=title, body="\n".join(body_parts),
+        assignee=assignee, parallel=False, created_by=from_agent,
+        chat=chat, auto_route=False)
+    out = {
+        "ok": True,
+        "executes_on": "mac-mini-hermes",
+        "note": ("Hosted MCP does not proxy taps. Hermes claims via "
+                 "board_tick and runs phone-harness on the Mac."),
+        "task": task,
+    }
+    if notify:
+        handoff = (
+            f"role: handoff\ntask: {slug}\ndo: {job}\n"
+            f"done when: {done_when or 'task done'}\n"
+            f"via: request_phone task_id={task['id']}"
+        )
+        out["handoff"] = _message_peer(brain, {
+            "agent": from_agent, "to_agent": assignee,
+            "body": handoff, "title": f"phone-{slug}",
+            "project": chat if chat != "peers" else "peers",
+        })
+    return out
+
+
 def _whoami(brain, args):
     from . import roster
     tok = (args.get("token") or "").strip()
@@ -732,8 +797,8 @@ TOOL_FUNCS = {t["name"]: f for t, f in zip(
             _remove_board_member, _list_tasks, _add_task, _claim_task,
             _update_task, _list_briefs, _get_brief, _set_brief,
             _session_pack, _get_policy, _set_policy, _agent_ready,
-            _agent_poll, _board_tick, _reassign_task, _whoami, _join_agent,
-            _create_board, _mint_key])}
+            _agent_poll, _board_tick, _reassign_task, _request_phone,
+            _whoami, _join_agent, _create_board, _mint_key])}
 
 
 def handle(brain, msg):

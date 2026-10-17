@@ -31,11 +31,22 @@ PY
 
 Helpers (full list: `phone-harness skill`): `ensure_device`, `screen`, `screenshot`, `find_text` / `tap_text`, `tap`, `type_text`, `open_app`, `swipe` / `scroll`, `home`, `wait_for_text`.
 
-## Agent-manager usage
+## Agent-manager usage (Mac executor)
 
-1. Claim or receive an on-device task that needs the phone (Hermes ticks, or any agent on this Mac).
+1. Claim or receive an on-device / phone task (Hermes `board_tick`, or any agent on this Mac).
 2. Run the CLI above in the Mac mini environment (Cursor self-hosted worker, Terminal, or Hermes with the phone-harness plugin).
 3. Save outcomes with MCP `note` (`project: phone-control` or the task's project). Do not store OTPs, passwords, or Apple credentials in the brain.
+4. Finish: `update_task(id, status=done)` + peers `role: done` (no secrets).
+
+## Remote agents (register only)
+
+If you are **not** on the Mac mini, do **not** shell out to `phone-harness`. Queue work for Mac Hermes:
+
+```
+request_phone(do="<one job>", done_when="<check>", from_agent=<you>)
+```
+
+Equivalents: `add_task(title="on-device: …", chat=peers)` (auto-routes to hermes) or `message_peer` handoff. The hosted MCP never executes taps — see `docs/PHONE-HARNESS.md`.
 
 ## Limits
 

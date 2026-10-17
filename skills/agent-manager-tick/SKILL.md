@@ -33,6 +33,9 @@ plans and reassigns; you execute on-device work.
    - `claim` → `claim_task` (or re-call with `claim=true`), then do the body
    - `continue` / `claimed` → do the claimed task body
 3. **Work** the single task. Keep it small enough for one tick.
+   Phone / `on-device:` jobs: run local `phone-harness` on this Mac
+   (skill `phone-harness`). Remote peers queue via `request_phone` —
+   you are the executor, not the brain.
 4. **Finish**: `update_task(id, status=done)` then
    `message_peer(agent=hermes, to_agent=cursor, body=role: done\ntask: <slug>\nresult: …)`
 5. **Stop**. Do not start a second board task this wake.

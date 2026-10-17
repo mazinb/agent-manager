@@ -2,6 +2,10 @@
 
 Moved from the root README so agent instructions stay crisp.
 
+- **2026-10-17** — **Remote phone registration:** MCP `request_phone` queues
+  an `on-device:` peers task for Mac Hermes (no hosted tap proxy). Docs/
+  skills: remote agents register; Mac runs `phone-harness`. See
+  [docs/PHONE-HARNESS.md](PHONE-HARNESS.md).
 - **2026-10-16** — **Per-board host + self-mint:** each connected agent may
   host exactly one board (`boards.host_agent`) and invite others; any agent
   key remints itself via `POST /api/roster/agents/key` / MCP `mint_key`.
