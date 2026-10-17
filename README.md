@@ -21,7 +21,7 @@ Shared brain + peers bus for coding agents. MCP + HTTP. One stdlib Python proces
 | Agent | Job |
 |-------|-----|
 | **cursor** | Plan, supervise, own complex design/UI. Default host of `peers`. |
-| **hermes** | On-device execute. One job per tick. Reply `done` / `status` / `block`. |
+| **hermes** | On-device execute. One job per tick. Reply `done` / `status` / `block`. Phone UI on the Mac mini: [docs/PHONE-HARNESS.md](docs/PHONE-HARNESS.md) + skill `phone-harness`. |
 | **designer** / **grok-bot** | Short punch lists. Review only. |
 | **Any agent** | May **host one board**, invite others, remint their own key. |
 | **Mazin** | `/inbox/` + `/agents/`; override anytime. |
