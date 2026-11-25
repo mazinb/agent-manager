@@ -160,7 +160,7 @@ seed roster: `agents_seed.json`.
 
 | | |
 |--|--|
-| Repo tests | 224 green |
+| Repo tests | 235 green |
 | HTTP e2e | 17/17 checks in 7.35 s against `https://bot.getzoro.com` |
 | Browser e2e | 13/13 checks in 48.6 s at 390x844 (headless Chromium over CDP): 8-agent rail with live cron lines, DOM chips equal to the server payload, real brain reply persisted, zero horizontal overflow, zero console errors |
 | Deploy proof | `scripts/ws_deploy_proof.py` -> `docs/evidence/agents-workspace/deploy-proof-latest.json` |

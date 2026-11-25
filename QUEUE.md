@@ -148,8 +148,8 @@ never touch the GLM brain or docker containers.
   the deploy proof covers. New `scripts/ws_deploy_proof.py` records service
   state, HEAD vs origin/main, the endpoint codes, the latest e2e evidence and
   the repo suite into `docs/evidence/agents-workspace/deploy-proof-latest.json`
-  (token never recorded); `tests/test_ws_deploy_proof.py` 14 tests and
-  `tests/test_ws_docs.py` 9 tests; full suite 233 green. Deploy proof numbers
+  (token never recorded); `tests/test_ws_deploy_proof.py` 16 tests and
+  `tests/test_ws_docs.py` 9 tests; full suite 235 green. Deploy proof numbers
   are recorded in the follow-up evidence commit against this HEAD.
   `agents-workspace-tick` (`b73ac2ccbcbb`, 30m) is removed after this tick;
   item 8 stays optional and needs no scheduler. Deviation: item 5's checkbox

@@ -149,6 +149,24 @@ class DeployProof(unittest.TestCase):
             self.assertEqual(ev["http"]["passed"], 17)
             self.assertFalse(ev["browser"]["present"])
 
+    def test_browser_evidence_without_ok_flag(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "browser-e2e-latest.json"), "w") as f:
+                json.dump({"timestamp": "t", "summary": {"total": 13, "passed": 13,
+                                                        "failed": 0,
+                                                        "failed_ids": []}}, f)
+            ev = ws_deploy_proof.load_latest_evidence(d)
+            self.assertTrue(ev["browser"]["ok"])
+            self.assertEqual(ev["browser"]["passed"], 13)
+
+    def test_browser_evidence_failure_without_ok_flag(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "browser-e2e-latest.json"), "w") as f:
+                json.dump({"summary": {"total": 13, "passed": 11, "failed": 2,
+                                       "failed_ids": ["a", "b"]}}, f)
+            ev = ws_deploy_proof.load_latest_evidence(d)
+            self.assertFalse(ev["browser"]["ok"])
+
     def test_expected_agents_from_seed(self):
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "agents_seed.json"), "w") as f:

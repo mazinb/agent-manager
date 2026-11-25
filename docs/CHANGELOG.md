@@ -181,5 +181,5 @@ Moved from the root README so agent instructions stay crisp.
   the measured results, `docs/agents-workspace.md` section 8 (results + deploy
   proof scope), `scripts/ws_deploy_proof.py` (service state, HEAD vs
   origin/main, endpoint codes, latest e2e evidence and the suite; token never
-  recorded) with 14 tests and a docs/evidence contract test (9). 233 tests
+  recorded) with 16 tests and a docs/evidence contract test (9). 235 tests
   green; the `agents-workspace-tick` build job was removed.

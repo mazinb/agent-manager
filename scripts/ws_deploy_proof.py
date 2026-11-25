@@ -96,13 +96,22 @@ def load_latest_evidence(out_dir=EVIDENCE_DIR):
             found[kind] = entry
             continue
         summary = data.get("summary") or {}
+        total = summary.get("total") or 0
+        passed = summary.get("passed") or 0
+        failed = summary.get("failed")
+        explicit = data.get("ok")
+        if isinstance(explicit, bool):
+            ok = explicit
+        else:
+            # browser e2e records summary only; green means every check passed
+            ok = bool(total) and passed == total and failed == 0
         entry.update({
             "present": True,
-            "ok": bool(data.get("ok")),
+            "ok": ok,
             "timestamp": data.get("timestamp") or data.get("started_at"),
-            "total": summary.get("total"),
-            "passed": summary.get("passed"),
-            "failed": summary.get("failed"),
+            "total": total,
+            "passed": passed,
+            "failed": failed,
             "duration_s": data.get("duration_s")
             or round((data.get("elapsed_ms") or 0) / 1000.0, 1),
         })

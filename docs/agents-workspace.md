@@ -142,7 +142,7 @@ Shipped 2026-11-25. The numbers below are from real runs against
 
 | Check | Result |
 |---|---|
-| Repo tests | 224 green (`python3 -m unittest tests.test_*`) |
+| Repo tests | 235 green (`python3 -m unittest tests.test_*`) |
 | HTTP e2e | 17/17 checks in 7.35 s (`scripts/ws_e2e.py`) |
 | Browser e2e | 13/13 checks in 48.6 s at 390x844 (`scripts/ws_browser_e2e.py`): 8-agent rail, live cron next-run lines, DOM chips == server payload, ghost fill without send, real brain reply persisted, peer tab, zero horizontal overflow, zero console errors |
 | Deploy proof | `scripts/ws_deploy_proof.py` records service state, HEAD vs origin/main, endpoint codes, latest evidence and the test suite into `deploy-proof-latest.json` |
