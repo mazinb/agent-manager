@@ -10,7 +10,7 @@ repo tests; commit with `Mazin Biviji <5017609+mazinb@users.noreply.github.com>`
 when routes or UI change; record the item, evidence and any deviation here;
 never touch the GLM brain or docker containers.
 
-- [ ] 1. `agent_context/ws.py`: schema (ws_agents, ws_messages, ws_runs,
+- [x] 1. `agent_context/ws.py`: schema (ws_agents, ws_messages, ws_runs,
       ws_peers), idempotent seed from `agents_seed.json`, CRUD, chat via
       `agent_context/llm.py` + brain config, run records, peer bus, A2A card
       builder. Unit tests in `tests/test_ws.py`.
@@ -35,3 +35,14 @@ never touch the GLM brain or docker containers.
 - 2026-11-25 13:0x — queue created; cron audit done (16 -> 11 jobs, five stale
   annual feat jobs removed, ring tick converted to no-agent script, planner
   moved to daily 08:15). Build starts at item 1.
+- 2026-11-25 — item 1 done: `agent_context/ws.py` (additive ws_* schema with
+  idempotent column migration, seed via `ON CONFLICT(slug) DO NOTHING` so an
+  edited prompt survives, list/get/patch, AG-UI-shaped chat through
+  `llm.complete` + brain config, run start/finish/record, peer bus with
+  `a2a-` task ids mirrored into the target thread, server chips/ghost, agent
+  and workspace A2A cards). `tests/test_ws.py` 21 tests green; full suite 126
+  green. Evidence: temp-DB smoke against the live brain returned "The default
+  brain mode is GLM, served by the GLM TensorFold engine on port 8888" with
+  RUN_STARTED/TEXT_MESSAGE_CONTENT/RUN_FINISHED. Deviations: AG-UI events use
+  spec camelCase (`runId`, `threadId`); chat runs are recorded with
+  `job_id='chat'`; no routes yet, so the service was not restarted.
