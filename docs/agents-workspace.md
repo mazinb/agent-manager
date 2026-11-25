@@ -1,6 +1,6 @@
 # Agents workspace at bot.getzoro.com
 
-2026-11-25. Status: design approved for build (P0).
+2026-11-25. Status: shipped (queue items 1-7 done; optional item 8 open).
 
 ## 1. Why
 
@@ -133,3 +133,27 @@ overnight LLM runs are zero.
 
 No OpenBot deployment, no Postgres, no OAuth, no native app, no per-agent
 vector memory, no autonomous tool use in chat (scheduled runs keep tools).
+
+## 8. Measured results and deploy proof
+
+Shipped 2026-11-25. The numbers below are from real runs against
+`https://bot.getzoro.com`, not estimates; the raw records sit in
+`docs/evidence/agents-workspace/` and never contain the token.
+
+| Check | Result |
+|---|---|
+| Repo tests | 224 green (`python3 -m unittest tests.test_*`) |
+| HTTP e2e | 17/17 checks in 7.35 s (`scripts/ws_e2e.py`) |
+| Browser e2e | 13/13 checks in 48.6 s at 390x844 (`scripts/ws_browser_e2e.py`): 8-agent rail, live cron next-run lines, DOM chips == server payload, ghost fill without send, real brain reply persisted, peer tab, zero horizontal overflow, zero console errors |
+| Deploy proof | `scripts/ws_deploy_proof.py` records service state, HEAD vs origin/main, endpoint codes, latest evidence and the test suite into `deploy-proof-latest.json` |
+
+Deploy proof covers: `agent-manager.service` active; HEAD == origin/main with a
+clean tree; `/api/ws/agents` 401 without a token and 200 with 8 agents; `/bot/`
+200 with the rail/composer/token-gate markers; `/favicon.ico` 204 before the
+auth gate; `/.well-known/agent-card.json` 200 with skills.
+
+Screenshots: `browser-e2e-latest-rail.png`, `browser-e2e-latest-chat.png`.
+
+The build tick (`agents-workspace-tick`, every 30 m) was removed after item 7
+landed; item 8 stays optional and needs no scheduler — fold the 04:00 health
+sweep into the 08:00 audit by editing the two cron jobs once.

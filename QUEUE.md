@@ -1,7 +1,7 @@
 # QUEUE — agents workspace (bot.getzoro.com)
 
 Design: `docs/agents-workspace.md`. Seed: `agents_seed.json`. One item per tick.
-Tick job: `agents-workspace-tick` (30m, deliver origin, attach_to_session).
+Tick job: `agents-workspace-tick` (30m) — retired after item 7.
 
 Rules: read the design doc first; work only the next unchecked item; run the
 repo tests; commit with `Mazin Biviji <5017609+mazinb@users.noreply.github.com>`
@@ -23,11 +23,11 @@ never touch the GLM brain or docker containers.
       to the nav on home/agents/brain.
 - [x] 4. Cron sync: map `source_job_ids` to `~/.hermes/cron/jobs.json`, show
       schedule/last status/next run; Run now verified against a real job.
-- [ ] 5. HTTP e2e: script + evidence JSON under `docs/evidence/agents-workspace/`.
+- [x] 5. HTTP e2e: script + evidence JSON under `docs/evidence/agents-workspace/`.
 - [x] 6. Browser e2e 390x844: screenshots, no overflow, no console errors,
       real brain reply.
-- [ ] 7. README section, measured results, deploy proof, remove this tick.
-- [ ] 8. Optional: fold the 04:00 health sweep into the 08:00 audit; then
+- [x] 7. README section, measured results, deploy proof, remove this tick.
+- [ ] 8. Optional (not tick-scheduled): fold the 04:00 health sweep into the 08:00 audit; then
       overnight LLM runs are zero.
 
 ## Tick log
@@ -138,3 +138,20 @@ never touch the GLM brain or docker containers.
   restarted and verified (favicon 204, `/api/ws/agents` 8 agents). Item 5's
   checkbox had been left unchecked in `26fecc7`; flipped here after verifying
   its script, tests and evidence at that commit.
+
+- 2026-11-25 16:2x — item 7 done: README section 4 "Agents workspace
+  (`/bot/`)" covers the rail/chat/cron/peer bus, AG-UI and A2A wire shapes,
+  the token rules (public discovery cards, in-page gate) and the endpoint
+  list, with a measured-results table (17/17 HTTP e2e in 7.35 s, 13/13
+  browser e2e in 48.6 s at 390x844, evidence paths). `docs/agents-workspace.md`
+  is marked shipped and gained section 8 with the measured results and what
+  the deploy proof covers. New `scripts/ws_deploy_proof.py` records service
+  state, HEAD vs origin/main, the endpoint codes, the latest e2e evidence and
+  the repo suite into `docs/evidence/agents-workspace/deploy-proof-latest.json`
+  (token never recorded); `tests/test_ws_deploy_proof.py` 14 tests and
+  `tests/test_ws_docs.py` 9 tests; full suite 233 green. Deploy proof numbers
+  are recorded in the follow-up evidence commit against this HEAD.
+  `agents-workspace-tick` (`b73ac2ccbcbb`, 30m) is removed after this tick;
+  item 8 stays optional and needs no scheduler. Deviation: item 5's checkbox
+  was still unticked at HEAD (the item-6 log said it flipped); flipped here
+  after re-verifying its script, tests and green evidence.
