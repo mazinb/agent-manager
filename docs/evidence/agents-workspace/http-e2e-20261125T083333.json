@@ -1,0 +1,294 @@
+{
+  "kind": "agents-workspace-http-e2e",
+  "started_at": "2026-11-25T08:33:33.525711+00:00",
+  "finished_at": "2026-11-25T08:33:40.876155+00:00",
+  "duration_s": 7.35,
+  "base_url": "https://bot.getzoro.com",
+  "agent": "health-auditor",
+  "writes": true,
+  "run_now": true,
+  "job_id": "99eb38de9bb7",
+  "python": "3.14.7",
+  "token_present": true,
+  "ok": true,
+  "summary": {
+    "total": 17,
+    "passed": 17,
+    "failed": 0,
+    "skipped": 0
+  },
+  "checks": [
+    {
+      "id": "unauth_list_401",
+      "name": "workspace list requires a token",
+      "method": "GET",
+      "path": "/api/ws/agents",
+      "auth": false,
+      "expected": [
+        401
+      ],
+      "write": false,
+      "status": 401,
+      "ok": true,
+      "skipped": false,
+      "detail": "{\"error\": \"unauthorized\", \"hint\": \"Missing key. Pass X-Token or Authorization: Bearer with an agent key (mint at /agents/ or POST /api/roster/join) or the admin token. See /join/.\"}",
+      "elapsed_ms": 240
+    },
+    {
+      "id": "unauth_well_known",
+      "name": "A2A workspace card is public",
+      "method": "GET",
+      "path": "/.well-known/agent-card.json",
+      "auth": false,
+      "expected": [
+        200
+      ],
+      "write": false,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "name=Agent Manager skills=8",
+      "elapsed_ms": 206
+    },
+    {
+      "id": "unauth_bot_page",
+      "name": "/bot/ renders publicly",
+      "method": "GET",
+      "path": "/bot/",
+      "auth": false,
+      "expected": [
+        200
+      ],
+      "write": false,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "markers=['id=\"composer\"', 'id=\"token-gate\"', 'id=\"rail\"']",
+      "elapsed_ms": 251
+    },
+    {
+      "id": "list_agents",
+      "name": "token list returns seeded agents",
+      "method": "GET",
+      "path": "/api/ws/agents",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": false,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "count=8 slugs=['brain-ops', 'coach-builder', 'dwm-lab', 'health-auditor', 'ring-lab', 'scout', 'ship-watch', 'voice-lab']",
+      "elapsed_ms": 257
+    },
+    {
+      "id": "agent_detail",
+      "name": "agent detail has thread, runs, chips",
+      "method": "GET",
+      "path": "/api/ws/agents/health-auditor",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": false,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "slug=health-auditor missing=[] ghost=What is the latest on Overnight health-ops sweep, daily device audit, steps/dige...",
+      "elapsed_ms": 211
+    },
+    {
+      "id": "agent_messages",
+      "name": "agent message history",
+      "method": "GET",
+      "path": "/api/ws/agents/health-auditor/messages?limit=5",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": false,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "messages=4",
+      "elapsed_ms": 200
+    },
+    {
+      "id": "agent_runs",
+      "name": "agent run history",
+      "method": "GET",
+      "path": "/api/ws/agents/health-auditor/runs?limit=5",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": false,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "runs=4",
+      "elapsed_ms": 172
+    },
+    {
+      "id": "agent_card",
+      "name": "A2A agent card",
+      "method": "GET",
+      "path": "/api/ws/agents/health-auditor/card",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": false,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "name=Health Auditor url=https://bot.getzoro.com/api/ws/agents/health-auditor",
+      "elapsed_ms": 199
+    },
+    {
+      "id": "agent_card_unauth",
+      "name": "A2A agent card is public",
+      "method": "GET",
+      "path": "/api/ws/agents/health-auditor/card",
+      "auth": false,
+      "expected": [
+        200
+      ],
+      "write": false,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "name=Health Auditor url=https://bot.getzoro.com/api/ws/agents/health-auditor",
+      "elapsed_ms": 202
+    },
+    {
+      "id": "unknown_agent_404",
+      "name": "unknown agent is a designed 404",
+      "method": "GET",
+      "path": "/api/ws/agents/__e2e_missing__",
+      "auth": true,
+      "expected": [
+        404
+      ],
+      "write": false,
+      "status": 404,
+      "ok": true,
+      "skipped": false,
+      "detail": "{\"error\": \"unknown agent: __e2e_missing__\"}",
+      "elapsed_ms": 206
+    },
+    {
+      "id": "chat_reply",
+      "name": "chat gets a real brain reply (AG-UI)",
+      "method": "POST",
+      "path": "/api/ws/agents/health-auditor/messages",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": true,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "reply=I own the overnight sweep, the 08:00 device audit, the steps and digest scripts, and device recon. I answer from run history and known facts, point at Run now w... events=['RUN_STARTED', 'TEXT_MESSAGE_CONTENT', 'RUN_FINISHED']",
+      "elapsed_ms": 1377
+    },
+    {
+      "id": "chat_persisted",
+      "name": "chat turn is stored in the thread",
+      "method": "GET",
+      "path": "/api/ws/agents/health-auditor/messages?limit=10",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": true,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "marker_present=True scanned=6",
+      "elapsed_ms": 214
+    },
+    {
+      "id": "peers_list",
+      "name": "peer bus list",
+      "method": "GET",
+      "path": "/api/ws/peers?limit=5",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": false,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "{\"peers\": [], \"count\": 0}",
+      "elapsed_ms": 191
+    },
+    {
+      "id": "peer_send",
+      "name": "peer send returns an A2A task id",
+      "method": "POST",
+      "path": "/api/ws/agents/health-auditor/to",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": true,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "task_id=a2a-042d1146b15b4c2c87d7610ea3282fa7",
+      "elapsed_ms": 208
+    },
+    {
+      "id": "a2a_message_send",
+      "name": "A2A message/send completes a task",
+      "method": "POST",
+      "path": "/a2a",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": true,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "task=a2a-ebe840a8525c4e8b8a4be14219176ae7 state=completed text=Status: I am up and answering. This is the e2e probe at 20261125T083333Z, and I have responded to both of its questions ...",
+      "elapsed_ms": 1874
+    },
+    {
+      "id": "a2a_bad_method",
+      "name": "unknown A2A method is -32601",
+      "method": "POST",
+      "path": "/a2a",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": false,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "error_code=-32601",
+      "elapsed_ms": 244
+    },
+    {
+      "id": "run_now",
+      "name": "run now triggers the source cron job",
+      "method": "POST",
+      "path": "/api/ws/agents/health-auditor/run",
+      "auth": true,
+      "expected": [
+        200
+      ],
+      "write": true,
+      "status": 200,
+      "ok": true,
+      "skipped": false,
+      "detail": "job_id=99eb38de9bb7 run_status=ok run_id=23332e5223114cee8dd39cb61a4f84d3",
+      "elapsed_ms": 1090
+    }
+  ]
+}

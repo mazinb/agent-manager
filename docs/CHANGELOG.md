@@ -2,6 +2,15 @@
 
 Moved from the root README so agent instructions stay crisp.
 
+- **2026-11-25** — **Agents workspace HTTP e2e:** `scripts/ws_e2e.py` runs the
+  acceptance calls from the design doc against a live instance (unauth 401,
+  public A2A cards, `/bot/` markers, agent list/detail/messages/runs, chat
+  with a real brain reply, peer send, A2A `message/send`, designed errors,
+  optional run-now) and writes an evidence JSON to
+  `docs/evidence/agents-workspace/`. Token is read from `.env` and never
+  recorded. Explicit User-Agent header (Cloudflare rejects Python's default
+  signature with error 1010). Tests `tests/test_ws_e2e.py` against a stub
+  server.
 - **2026-11-25** — **Agents workspace live cron sync:** `agent_context/cron_sync.py`
   reads `~/.hermes/cron/jobs.json` read-only and maps each agent's
   `source_job_ids` to schedule, state, last status/time, next run and last

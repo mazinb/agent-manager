@@ -104,3 +104,20 @@ never touch the GLM brain or docker containers.
   `schedule_display` (some jobs store raw cron exprs, e.g. `0 */6 * * *`); no
   formatting layer added. Run now was verified on the script job rather than
   the LLM digest so no duplicate Telegram delivery was produced.
+
+- 2026-11-25 08:3x — item 5 done: `scripts/ws_e2e.py` (stdlib, token from
+  `.env`, never recorded; `--no-writes`/`--run --job-id` flags) runs 17
+  acceptance checks and writes `docs/evidence/agents-workspace/
+  http-e2e-<ts>.json` + `http-e2e-latest.json`. `tests/test_ws_e2e.py` 7 tests
+  green against a stub HTTP server; full suite 189 green. Live run against
+  `https://bot.getzoro.com` (token, real writes): 17/17 passed in 7.35s —
+  unauth list 401, public well-known + agent cards 200, `/bot/` markers 200,
+  list 8 agents, chat reply from the real brain (AG-UI RUN_STARTED/
+  TEXT_MESSAGE_CONTENT/RUN_FINISHED), thread persisted, peer task
+  `a2a-042d1146...`, A2A `message/send` completed, bad method -32601, run now
+  on device-recon `99eb38de9bb7` rc ok. No route/UI change, so no restart;
+  service confirmed active and public endpoint answered. Deviations: first
+  public attempt hit Cloudflare error 1010 on urllib's default User-Agent, so
+  the script sends an explicit UA; evidence from that failed attempt was
+  removed. Chat/peer/A2A checks write to the prod thread/bus by design;
+  `--no-writes` skips them.
