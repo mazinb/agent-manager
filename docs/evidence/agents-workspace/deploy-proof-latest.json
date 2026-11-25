@@ -1,0 +1,128 @@
+{
+ "base_url": "https://bot.getzoro.com",
+ "checks": [
+  {
+   "detail": "state=active",
+   "expected": "active",
+   "id": "service_active",
+   "name": "agent-manager.service is active",
+   "ok": true
+  },
+  {
+   "detail": "head=d47f7da92db8 origin=d47f7da92db8 branch=main dirty=False",
+   "expected": "HEAD == origin/main, clean",
+   "id": "git_head",
+   "name": "HEAD equals origin/main with a clean tree",
+   "ok": true
+  },
+  {
+   "detail": "status=401",
+   "expected": 401,
+   "id": "unauth_list_401",
+   "name": "workspace list requires a token",
+   "ok": true
+  },
+  {
+   "detail": "status=200 missing=[]",
+   "expected": 200,
+   "id": "bot_page_200",
+   "name": "/bot/ serves the workspace shell",
+   "ok": true
+  },
+  {
+   "detail": "status=204",
+   "expected": 204,
+   "id": "favicon_204",
+   "name": "favicon answers before the auth gate",
+   "ok": true
+  },
+  {
+   "detail": "status=200 skills=8",
+   "expected": 200,
+   "id": "well_known_200",
+   "name": "A2A workspace card is public",
+   "ok": true
+  },
+  {
+   "detail": "status=200 count=8",
+   "expected": "200, 8 agents",
+   "id": "token_list",
+   "name": "token list returns the seeded roster",
+   "ok": true
+  },
+  {
+   "detail": "status=200 chips=True",
+   "expected": 200,
+   "id": "agent_detail",
+   "name": "agent detail returns thread, runs, chips",
+   "ok": true
+  },
+  {
+   "detail": "present=True ok=True passed=17 failed=0",
+   "expected": "present, ok, 0 failed",
+   "id": "evidence_http",
+   "name": "latest http e2e evidence is green",
+   "ok": true
+  },
+  {
+   "detail": "present=True ok=True passed=13 failed=0",
+   "expected": "present, ok, 0 failed",
+   "id": "evidence_browser",
+   "name": "latest browser e2e evidence is green",
+   "ok": true
+  },
+  {
+   "detail": "ran=235 rc=0",
+   "expected": "OK",
+   "id": "repo_tests",
+   "name": "repo test suite is green",
+   "ok": true
+  }
+ ],
+ "evidence": {
+  "browser": {
+   "duration_s": 48.6,
+   "failed": 0,
+   "file": "browser-e2e-latest.json",
+   "kind": "browser",
+   "ok": true,
+   "passed": 13,
+   "present": true,
+   "timestamp": "20261125T091441",
+   "total": 13
+  },
+  "http": {
+   "duration_s": 7.35,
+   "failed": 0,
+   "file": "http-e2e-latest.json",
+   "kind": "http",
+   "ok": true,
+   "passed": 17,
+   "present": true,
+   "timestamp": "2026-11-25T08:33:33.525711+00:00",
+   "total": 17
+  }
+ },
+ "git": {
+  "branch": "main",
+  "dirty": false,
+  "head": "d47f7da92db8f5462e39537fdb9c1cdf12b1fe00",
+  "head_equals_origin": true,
+  "origin_main": "d47f7da92db8f5462e39537fdb9c1cdf12b1fe00"
+ },
+ "kind": "agents-workspace-deploy-proof",
+ "ok": true,
+ "service": "active",
+ "summary": {
+  "failed": 0,
+  "failed_ids": [],
+  "passed": 11,
+  "total": 11
+ },
+ "tests": {
+  "ok": true,
+  "ran": 235,
+  "rc": 0
+ },
+ "timestamp": "20261125T095418"
+}

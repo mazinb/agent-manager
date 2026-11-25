@@ -155,3 +155,11 @@ never touch the GLM brain or docker containers.
   item 8 stays optional and needs no scheduler. Deviation: item 5's checkbox
   was still unticked at HEAD (the item-6 log said it flipped); flipped here
   after re-verifying its script, tests and green evidence.
+
+- 2026-11-25 16:5x — deploy proof: 11/11 checks green on HEAD `d47f7da`
+  (service active, HEAD == origin/main with a clean tree, unauth list 401,
+  `/bot/` 200 with rail/composer/token-gate markers, favicon 204,
+  well-known card 200 with 8 skills, token list 8 agents, detail with chips,
+  HTTP e2e 17/17, browser e2e 13/13, suite 235 green). JSON:
+  `docs/evidence/agents-workspace/deploy-proof-latest.json`, token never
+  recorded.
