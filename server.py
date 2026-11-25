@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
 from agent_context import checks, github_login, llm, mcp, query, store  # noqa: E402
-from agent_context import autonote, roster  # noqa: E402
+from agent_context import autonote, roster, ws, ws_routes  # noqa: E402
 from agent_context.server import Brain  # noqa: E402
 
 STATIC = os.path.join(ROOT, "static")
@@ -460,8 +460,26 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(401, {"error": "unauthorized",
                                         "hint": str(e)})
 
+        base = ws_routes.base_from_host(self.headers.get("Host"))
+        # A2A discovery: agent cards stay public (pre-login clients fetch them).
+        if path == "/.well-known/agent-card.json":
+            try:
+                return self._json(200, ws_routes.well_known(BRAIN.con, base))
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+        if path.startswith("/api/ws/agents/") and path.endswith("/card"):
+            out = ws_routes.get(BRAIN.con, path, q, base)
+            if out:
+                return self._json(*out)
+
         if not self._authed():
             return self._unauth()
+
+        if (path == "/api/ws/agents" or path.startswith("/api/ws/agents/")
+                or path == "/api/ws/peers"):
+            out = ws_routes.get(BRAIN.con, path, q, base)
+            if out:
+                return self._json(*out)
 
         if path == "/api/inbox":
             project = (q.get("project") or [None])[0] or None
@@ -633,8 +651,24 @@ class Handler(BaseHTTPRequestHandler):
 
         return self._json(404, {"error": "not found"})
 
+    def do_PATCH(self):
+        path = urlparse(self.path).path
+        if not path.startswith("/api/ws/agents/"):
+            return self._json(404, {"error": "not found"})
+        if not self._authed():
+            return self._unauth()
+        try:
+            payload = self._read_json()
+        except Exception:
+            return self._json(400, {"error": "bad json"})
+        out = ws_routes.patch(BRAIN.con, path, payload)
+        if out:
+            return self._json(*out)
+        return self._json(404, {"error": "not found"})
+
     def do_POST(self):
         path = urlparse(self.path).path
+        base = ws_routes.base_from_host(self.headers.get("Host"))
 
         if path.startswith("/space"):
             return self._json(410, {"error": "gone"})
@@ -695,7 +729,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"ok": True})
             return self._json(401, {"ok": False, "error": "unauthorized"})
 
-        if path not in (
+        if path != "/a2a" and not path.startswith("/api/ws/") and path not in (
             "/api/ask", "/api/refresh", "/api/note",
             "/api/project/visibility", "/mcp",
             "/api/session/bootstrap",
@@ -993,6 +1027,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(202, {})
             return self._json(200, resp)
 
+        if path == "/a2a":
+            return self._json(200, ws_routes.a2a(
+                BRAIN.con, payload, base,
+                llm_cfg=BRAIN.config.get("llm") or {}))
+
+        if path.startswith("/api/ws/"):
+            out = ws_routes.post(BRAIN.con, path, payload, base,
+                                 llm_cfg=BRAIN.config.get("llm") or {})
+            if out:
+                return self._json(*out)
+            return self._json(404, {"error": "not found"})
+
         if path == "/api/note":
             try:
                 return self._json(200, mcp.TOOL_FUNCS["note"](BRAIN, payload))
@@ -1031,6 +1077,12 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     store.connect(BRAIN_CFG["db_path"]).close()
+    try:
+        seeded = ws.seed(BRAIN.con)
+        print(f"  ws agents: {seeded['total']} "
+              f"(inserted {seeded['inserted']})", flush=True)
+    except Exception as e:  # a bad seed must not stop the service
+        print(f"  ws seed failed: {e}", flush=True)
     port = int(os.environ.get("AGENT_MANAGER_PORT", "8075"))
     print(f"agent-manager on :{port} (setup + brain + mcp)", flush=True)
     print(f"  bootstrap={not configured()} signup_open={ALLOW_PUBLIC_SIGNUP}",

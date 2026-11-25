@@ -14,7 +14,7 @@ never touch the GLM brain or docker containers.
       ws_peers), idempotent seed from `agents_seed.json`, CRUD, chat via
       `agent_context/llm.py` + brain config, run records, peer bus, A2A card
       builder. Unit tests in `tests/test_ws.py`.
-- [ ] 2. Routes in `server.py` (token auth): list, detail (+messages/runs/chips),
+- [x] 2. Routes in `server.py` (token auth): list, detail (+messages/runs/chips),
       post message (JSON reply for P0), run now (`hermes cron run <job>`),
       runs, patch, peer send, peers list, agent card,
       `/.well-known/agent-card.json`, `POST /a2a` (JSON-RPC message/send).
@@ -46,3 +46,23 @@ never touch the GLM brain or docker containers.
   RUN_STARTED/TEXT_MESSAGE_CONTENT/RUN_FINISHED. Deviations: AG-UI events use
   spec camelCase (`runId`, `threadId`); chat runs are recorded with
   `job_id='chat'`; no routes yet, so the service was not restarted.
+
+- 2026-11-25 — item 2 done: `agent_context/ws_routes.py` holds the route logic
+  (GET list/detail/messages/runs/card/peers, POST messages/run/to, POST
+  peers/read, PATCH agent, A2A message/send, run_cron_job via
+  `hermes cron run`) and `server.py` is a thin dispatch: public
+  `/.well-known/agent-card.json` and `/api/ws/agents/<slug>/card` before the
+  auth gate, every other ws route and `/a2a` after it; new `do_PATCH`; startup
+  seeds ws_agents. `tests/test_ws_routes.py` 25 tests green; full suite 151
+  green. Evidence: temp instance on :8099 with a temp DB and the repo admin
+  token — unauth list 401, well-known card 200 with 8 skills, list 8 agents,
+  real brain chat reply (RUN_STARTED/TEXT_MESSAGE_CONTENT/RUN_FINISHED),
+  PATCH ok, peer task id `a2a-...`, A2A message/send completed with a real
+  Ring Lab reply, bad method -32601, run now on daily-health-digest
+  (`3fb498c29968`) succeeded in 6.7s and recorded status ok. Deviations:
+  agent cards are unauthenticated for A2A discovery (design said token auth;
+  everything else stays token-only); `POST /api/ws/peers/read` added to use
+  the existing mark_peer_read; run now blocks until the job ends and returns
+  502 with the run recorded as error when it fails; job_id must belong to the
+  agent's `source_job_ids`; A2A target agent comes from
+  `params.metadata.agent` and returns a Task (completed/failed).

@@ -134,3 +134,12 @@ Moved from the root README so agent instructions stay crisp.
   agent + worker on peers/orbit boards; designer connection notes in
   `~/projects/llm-playground/gorkbot/designer-board-access.md`. Deployed to
   main; service restarted.
+
+- **2026-11-25** — Agents workspace routes: `/api/ws/agents` (list, detail,
+  messages, runs, card), `POST .../messages` (AG-UI JSON events), `POST .../run`
+  (real `hermes cron run`, run recorded), `PATCH` agent, peer send/list/read,
+  public A2A cards at `/.well-known/agent-card.json` and
+  `/api/ws/agents/<slug>/card`, and token-authed `POST /a2a` (JSON-RPC
+  `message/send` returning a completed/failed Task). Route logic lives in
+  `agent_context/ws_routes.py` so it is testable without importing
+  `server.py`; ws_agents seeds at startup. 25 new tests; 151 total green.
