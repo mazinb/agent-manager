@@ -2,6 +2,12 @@
 
 Moved from the root README so agent instructions stay crisp.
 
+- **2026-11-25** — **Agents workspace UI (`/bot/`):** mobile-first workspace
+  at `bot.getzoro.com/bot/` over the ws API: grouped agent rail
+  (Operations/Labs/On-demand), per-agent thread, server-composed composer
+  chips + ghost (nothing hardcoded client-side), runs/prompt drawer, peer
+  bus tab, in-page token gate. Bot added to the shared nav. Route in
+  `server.py`; tests `tests/test_ws_ui.py`.
 - **2026-10-17** — **Session bootstrap (P0 packs fire):** MCP `initialize`
   returns pack `instructions` (session briefs always; `context_pack` when
   `?project=` is pinned). New tool + REST `session_bootstrap` /

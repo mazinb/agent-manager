@@ -6,6 +6,7 @@ One process on :8075:
   /setup/           Token onboarding (alias: /inbox/ — inbox UI once logged in)
   /agents/          Agent roster + shared tasks (alias: /connect/)
   /brain/           Shared brain UI
+  /bot/             Agents workspace (chat, runs, peers)
   /api/*            JSON API (token)
   /mcp              Streamable HTTP MCP (token on POST)
 
@@ -388,6 +389,10 @@ class Handler(BaseHTTPRequestHandler):
                               cache="public, max-age=60, s-maxage=120")
         if path in ("/brain", "/brain/"):
             return self._file(os.path.join(BRAIN_STATIC, "index.html"),
+                              "text/html; charset=utf-8",
+                              cache="private, max-age=0")
+        if path in ("/bot", "/bot/"):
+            return self._file(os.path.join(STATIC, "bot.html"),
                               "text/html; charset=utf-8",
                               cache="private, max-age=0")
 

@@ -18,7 +18,7 @@ never touch the GLM brain or docker containers.
       post message (JSON reply for P0), run now (`hermes cron run <job>`),
       runs, patch, peer send, peers list, agent card,
       `/.well-known/agent-card.json`, `POST /a2a` (JSON-RPC message/send).
-- [ ] 3. UI `/bot/`: agent rail, thread, composer with server chips + ghost,
+- [x] 3. UI `/bot/`: agent rail, thread, composer with server chips + ghost,
       runs drawer, peer tab, 390 px mobile, no client-invented chips. Add Bot
       to the nav on home/agents/brain.
 - [ ] 4. Cron sync: map `source_job_ids` to `~/.hermes/cron/jobs.json`, show
@@ -66,3 +66,19 @@ never touch the GLM brain or docker containers.
   502 with the run recorded as error when it fails; job_id must belong to the
   agent's `source_job_ids`; A2A target agent comes from
   `params.metadata.agent` and returns a Task (completed/failed).
+
+- 2026-11-25 — item 3 done: `static/bot.html` served at `/bot/` (route in
+  `server.py`, private no-cache), rail grouped Operations/Labs/On-demand with
+  avatar/initial, status dot, schedule + last-run line, thread with grouped
+  author labels, composer whose chips and ghost come only from
+  `GET /api/ws/agents/<slug>` (`chips.chips` / `chips.ghost`; no hardcoded
+  labels), drawer (schedule, source job ids, runs, prompt editor, pause),
+  peer tab (list + send via existing `/to`), empty state with three recently
+  active, in-page token gate. Mobile: rail-first list, chat-open thread with
+  back, drawer as overlay sheet; 390 px is the acceptance width. Bot link
+  added to nav on home/agents/inbox/brain. `tests/test_ws_ui.py` 11 tests
+  (static contract + live `/bot/` route + unauth 401); full suite 162 green.
+  Evidence: temp-config HTTP server served `/bot` and `/bot/` 200 with the
+  rail/composer markup; live curl after restart in this tick. Deviation:
+  agent groups are a client-side slug map (design groups are presentational;
+  the roster API has no group column) — no new schema.
