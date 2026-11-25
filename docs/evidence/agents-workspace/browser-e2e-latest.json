@@ -1,0 +1,241 @@
+{
+  "timestamp": "20261125T091441",
+  "base": "https://bot.getzoro.com",
+  "viewport": {
+    "width": 390,
+    "height": 844,
+    "deviceScaleFactor": 2,
+    "mobile": true
+  },
+  "browser": "Chrome/145.0.7632.0",
+  "elapsed_ms": 48581,
+  "summary": {
+    "total": 13,
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0,
+    "failed_ids": []
+  },
+  "checks": [
+    {
+      "id": "page_load",
+      "name": "/bot/ loads with seeded token, gate closed",
+      "ok": true,
+      "skipped": false,
+      "detail": "title=Bot — Zoro url=https://bot.getzoro.com/bot/ gate="
+    },
+    {
+      "id": "rail_agents",
+      "name": "rail renders 8 agents",
+      "ok": true,
+      "skipped": false,
+      "detail": "rows=8 count=8 agents slugs=['brain-ops', 'health-auditor', 'ship-watch', 'dwm-lab', 'ring-lab', 'voice-lab', 'coach-builder', 'scout']"
+    },
+    {
+      "id": "rail_cron",
+      "name": "rail shows live cron next-run lines",
+      "ok": true,
+      "skipped": false,
+      "detail": "next_lines=3 groups=['Operations', 'Labs', 'On-demand']"
+    },
+    {
+      "id": "overflow_rail",
+      "name": "no horizontal overflow at 390 px (rail)",
+      "ok": true,
+      "skipped": false,
+      "detail": "innerWidth=390 doc=390 body=390 offenders=[]"
+    },
+    {
+      "id": "open_agent",
+      "name": "opening brain-ops renders thread and chips",
+      "ok": true,
+      "skipped": false,
+      "detail": "slug=brain-ops head=Brain Ops chips=3"
+    },
+    {
+      "id": "chips_server",
+      "name": "chips and ghost match the server payload",
+      "ok": true,
+      "skipped": false,
+      "detail": "api_status=200 dom=['Schedule', 'Open inbox', 'Last run'] api=['Schedule', 'Open inbox', 'Last run'] ghost_match=True"
+    },
+    {
+      "id": "ghost_fill",
+      "name": "ghost chip fills the composer without sending",
+      "ok": true,
+      "skipped": false,
+      "detail": "payload=What did the last run find? filled=True msg_delta=0"
+    },
+    {
+      "id": "overflow_chat",
+      "name": "no horizontal overflow at 390 px (chat)",
+      "ok": true,
+      "skipped": false,
+      "detail": "innerWidth=390 doc=390 body=390 offenders=[]"
+    },
+    {
+      "id": "chat_reply",
+      "name": "chat send returns a real brain reply",
+      "ok": true,
+      "skipped": false,
+      "detail": "reply=READY assistants=2 notes=[]"
+    },
+    {
+      "id": "chat_persisted",
+      "name": "sent message persisted in the thread",
+      "ok": true,
+      "skipped": false,
+      "detail": "marker_present=True scanned=4"
+    },
+    {
+      "id": "peer_tab",
+      "name": "peer tab renders form and bus view",
+      "ok": true,
+      "skipped": false,
+      "detail": "options=7 rows=0 empty="
+    },
+    {
+      "id": "overflow_peers",
+      "name": "no horizontal overflow at 390 px (peers)",
+      "ok": true,
+      "skipped": false,
+      "detail": "innerWidth=390 doc=390 body=390 offenders=[]"
+    },
+    {
+      "id": "console_errors",
+      "name": "no console errors or uncaught exceptions",
+      "ok": true,
+      "skipped": false,
+      "detail": "errors=0 []"
+    }
+  ],
+  "console_errors": [],
+  "screenshots": [
+    {
+      "name": "rail",
+      "path": "docs/evidence/agents-workspace/browser-e2e-20261125T091441-rail.png",
+      "bytes": 86062
+    },
+    {
+      "name": "chat",
+      "path": "docs/evidence/agents-workspace/browser-e2e-20261125T091441-chat.png",
+      "bytes": 118543
+    }
+  ],
+  "metrics": {
+    "rail": {
+      "innerWidth": 390,
+      "doc": 390,
+      "body": 390,
+      "containers": [
+        {
+          "id": "rail",
+          "sw": 390,
+          "cw": 390
+        },
+        {
+          "id": "agent-groups",
+          "sw": 374,
+          "cw": 374
+        },
+        {
+          "id": "thread",
+          "sw": 0,
+          "cw": 0
+        },
+        {
+          "id": "composer",
+          "sw": 0,
+          "cw": 0
+        },
+        {
+          "id": "chips",
+          "sw": 0,
+          "cw": 0
+        },
+        {
+          "id": "peers-view",
+          "sw": 0,
+          "cw": 0
+        }
+      ],
+      "offenders": []
+    },
+    "chat": {
+      "innerWidth": 390,
+      "doc": 390,
+      "body": 390,
+      "containers": [
+        {
+          "id": "rail",
+          "sw": 0,
+          "cw": 0
+        },
+        {
+          "id": "agent-groups",
+          "sw": 0,
+          "cw": 0
+        },
+        {
+          "id": "thread",
+          "sw": 390,
+          "cw": 390
+        },
+        {
+          "id": "composer",
+          "sw": 390,
+          "cw": 390
+        },
+        {
+          "id": "chips",
+          "sw": 366,
+          "cw": 366
+        },
+        {
+          "id": "peers-view",
+          "sw": 0,
+          "cw": 0
+        }
+      ],
+      "offenders": []
+    },
+    "peers": {
+      "innerWidth": 390,
+      "doc": 390,
+      "body": 390,
+      "containers": [
+        {
+          "id": "rail",
+          "sw": 0,
+          "cw": 0
+        },
+        {
+          "id": "agent-groups",
+          "sw": 0,
+          "cw": 0
+        },
+        {
+          "id": "thread",
+          "sw": 0,
+          "cw": 0
+        },
+        {
+          "id": "composer",
+          "sw": 0,
+          "cw": 0
+        },
+        {
+          "id": "chips",
+          "sw": 0,
+          "cw": 0
+        },
+        {
+          "id": "peers-view",
+          "sw": 390,
+          "cw": 390
+        }
+      ],
+      "offenders": []
+    }
+  }
+}

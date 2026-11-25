@@ -366,6 +366,15 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/space", "/space/") or path.startswith("/space/"):
             return self._json(410, {"error": "gone"})
 
+        # Browsers request this unauthenticated on every page; without it the
+        # auth gate answers 401 and the console fills with resource errors.
+        if path == "/favicon.ico":
+            self.send_response(204)
+            self.send_header("Cache-Control", "public, max-age=86400")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+
         # Edge-cacheable static shell. Brain UI stays short-cache (token UI).
         EDGE = "public, max-age=120, s-maxage=86400, stale-while-revalidate=604800"
         if path == "/static/app.css":

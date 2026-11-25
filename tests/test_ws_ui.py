@@ -136,6 +136,13 @@ class BotRoute(unittest.TestCase):
             self.assertIn('id="rail"', body)
             self.assertIn('id="composer"', body)
 
+    def test_favicon_not_gated(self):
+        # Chrome requests /favicon.ico without a token on every page; it must
+        # not fall through to the 401 auth gate and spam the console.
+        code, body = self.fetch("/favicon.ico")
+        self.assertEqual(code, 204)
+        self.assertEqual(body, "")
+
     def test_ws_api_still_gated(self):
         code, body = self.fetch("/api/ws/agents")
         self.assertEqual(code, 401)

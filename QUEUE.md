@@ -24,7 +24,7 @@ never touch the GLM brain or docker containers.
 - [x] 4. Cron sync: map `source_job_ids` to `~/.hermes/cron/jobs.json`, show
       schedule/last status/next run; Run now verified against a real job.
 - [ ] 5. HTTP e2e: script + evidence JSON under `docs/evidence/agents-workspace/`.
-- [ ] 6. Browser e2e 390x844: screenshots, no overflow, no console errors,
+- [x] 6. Browser e2e 390x844: screenshots, no overflow, no console errors,
       real brain reply.
 - [ ] 7. README section, measured results, deploy proof, remove this tick.
 - [ ] 8. Optional: fold the 04:00 health sweep into the 08:00 audit; then
@@ -121,3 +121,20 @@ never touch the GLM brain or docker containers.
   the script sends an explicit UA; evidence from that failed attempt was
   removed. Chat/peer/A2A checks write to the prod thread/bus by design;
   `--no-writes` skips them.
+
+- 2026-11-25 09:1x — item 6 done: `scripts/ws_browser_e2e.py` drives headless
+  Chromium over CDP at 390x844 against `https://bot.getzoro.com/bot/` and runs
+  13 checks: page loads with the seeded token and the gate closed, rail renders
+  8 agents with live cron next-run lines, DOM chips and ghost equal the server
+  payload, ghost chip fills the composer without sending, a real brain reply
+  ("READY") arrives and the sent message persists, peer tab renders, no
+  horizontal overflow on rail/chat/peers, zero console errors. It writes
+  screenshots + `browser-e2e-<ts>.json` / `browser-e2e-latest.json` under
+  `docs/evidence/agents-workspace/` (token never recorded).
+  `tests/test_ws_browser_e2e.py` 20 tests green; full suite 210 green. Live run
+  13/13 in 48.6 s. Deviation: the first run surfaced `/favicon.ico` 401s from
+  the auth gate in the console; fixed at the route level (204, cache 1 day,
+  before the gate) in `server.py` plus a test in `tests/test_ws_ui.py`, service
+  restarted and verified (favicon 204, `/api/ws/agents` 8 agents). Item 5's
+  checkbox had been left unchecked in `26fecc7`; flipped here after verifying
+  its script, tests and evidence at that commit.

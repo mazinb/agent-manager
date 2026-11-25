@@ -2,6 +2,16 @@
 
 Moved from the root README so agent instructions stay crisp.
 
+- **2026-11-25** — **Agents workspace browser e2e:** `scripts/ws_browser_e2e.py`
+  drives headless Chromium over CDP at 390x844 against a live instance and
+  checks the section 8 acceptance: rail with 8 agents and live cron next runs,
+  server-composed chips and ghost parity with the API payload, ghost fills
+  without sending, a real brain reply with the sent message persisted, peer
+  tab, no horizontal overflow, zero console errors; writes screenshots and
+  evidence JSON under `docs/evidence/agents-workspace/`. Also serves
+  `/favicon.ico` as 204 before the auth gate so browsers stop logging 401
+  resource errors. Tests `tests/test_ws_browser_e2e.py` and
+  `tests/test_ws_ui.py`.
 - **2026-11-25** — **Agents workspace HTTP e2e:** `scripts/ws_e2e.py` runs the
   acceptance calls from the design doc against a live instance (unauth 401,
   public A2A cards, `/bot/` markers, agent list/detail/messages/runs, chat
