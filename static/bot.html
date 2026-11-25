@@ -53,6 +53,7 @@ body{display:flex;flex-direction:column}
 .drawer-toggle{height:40px;padding:0 12px;background:none;border:1px solid var(--border);
   border-radius:8px;color:var(--dim);font-size:13px;cursor:pointer;flex-shrink:0}
 .drawer-toggle:hover{color:var(--fg);border-color:#484f58}
+.dt-sm{display:none}
 .thread{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 14px;min-height:0}
 .who{color:var(--dim);font:11px/1.3 var(--mono);margin:12px 0 3px}
 .who:first-child{margin-top:0}
@@ -161,8 +162,16 @@ body{display:flex;flex-direction:column}
     width:min(86vw,340px);flex:none;z-index:40;transform:translateX(100%);
     transition:transform .16s ease;box-shadow:-10px 0 26px #0009;border-left:1px solid var(--border)}
   .drawer.open{transform:none}
-  .main-head{padding:6px 10px;gap:8px}
+  .main-head{display:grid;grid-template-columns:44px minmax(0,1fr) 40px;
+    grid-template-rows:auto auto;gap:6px 8px;align-items:center;padding:6px 10px}
+  .back{grid-column:1;grid-row:1}
+  .head-id{grid-column:2;grid-row:1}
+  .tabs{grid-column:1/-1;grid-row:2;justify-content:flex-start}
   .tabs button{padding:0 9px}
+  .drawer-toggle{grid-column:3;grid-row:1;width:40px;padding:0}
+  .dt-full{display:none}
+  .dt-sm{display:inline;font-size:18px;line-height:1}
+  #head-avatar{display:none}
   .msg{max-width:88%}
   .thread{padding:10px 10px}
   .peer-top .task{margin-left:0;width:100%}
@@ -222,7 +231,7 @@ body{display:flex;flex-direction:column}
           <button type="button" data-tab="chat" class="on">Chat</button>
           <button type="button" data-tab="peers">Peers</button>
         </div>
-        <button class="drawer-toggle" id="drawer-toggle" type="button">Details</button>
+        <button class="drawer-toggle" id="drawer-toggle" type="button" aria-label="Details"><span class="dt-full">Details</span><span class="dt-sm">⋯</span></button>
       </div>
 
       <div id="thread" class="thread"></div>
@@ -496,7 +505,6 @@ async function selectAgent(slug) {
   const r = await api('/api/ws/agents/' + encodeURIComponent(slug));
   if (r.status !== 200 || !r.body) return;
   CURRENT = r.body;
-  TAB = 'chat';
   document.body.classList.add('chat-open');
   history.replaceState(null, '', '#' + slug);
   $('#empty').classList.add('hidden');
@@ -506,6 +514,7 @@ async function selectAgent(slug) {
   renderChips();
   renderDrawer();
   renderPeersForm();
+  setTab('chat');
   if (window.innerWidth >= 880) openDrawer(true);
   document.querySelectorAll('.agent-row').forEach(b => {
     b.classList.toggle('sel', b.dataset.slug === slug);
@@ -536,6 +545,8 @@ async function send() {
   if (!body || !CURRENT) return;
   input.value = '';
   const box = $('#thread');
+  const ph = box.querySelector('.empty');
+  if (ph) ph.remove();
   box.insertAdjacentHTML('beforeend', whoLine({ role: 'user', created_at: Date.now() / 1000 }));
   box.appendChild(bubble({ role: 'user', body }));
   const typing = bubble({ role: 'assistant', body: '…' });

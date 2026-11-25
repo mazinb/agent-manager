@@ -64,6 +64,11 @@ class BotPageShell(unittest.TestCase):
         self.assertIn("system_prompt", self.html)
         self.assertIn("source_job_ids", self.html)
 
+    def test_select_agent_resets_to_chat_tab(self):
+        # Picking an agent while the Peers tab is open must switch the pane
+        # back to chat, not leave the peer list over a chat-labelled header.
+        self.assertIn("setTab('chat');", self.html)
+
     def test_agui_events_consumed(self):
         self.assertIn("RUN_STARTED", self.html)
         self.assertIn("TEXT_MESSAGE_CONTENT", self.html)
