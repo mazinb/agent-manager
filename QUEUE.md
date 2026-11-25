@@ -21,7 +21,7 @@ never touch the GLM brain or docker containers.
 - [x] 3. UI `/bot/`: agent rail, thread, composer with server chips + ghost,
       runs drawer, peer tab, 390 px mobile, no client-invented chips. Add Bot
       to the nav on home/agents/brain.
-- [ ] 4. Cron sync: map `source_job_ids` to `~/.hermes/cron/jobs.json`, show
+- [x] 4. Cron sync: map `source_job_ids` to `~/.hermes/cron/jobs.json`, show
       schedule/last status/next run; Run now verified against a real job.
 - [ ] 5. HTTP e2e: script + evidence JSON under `docs/evidence/agents-workspace/`.
 - [ ] 6. Browser e2e 390x844: screenshots, no overflow, no console errors,
@@ -82,3 +82,25 @@ never touch the GLM brain or docker containers.
   rail/composer markup; live curl after restart in this tick. Deviation:
   agent groups are a client-side slug map (design groups are presentational;
   the roster API has no group column) — no new schema.
+
+- 2026-11-25 14:5x — item 4 done: `agent_context/cron_sync.py` reads the Hermes
+  cron registry read-only (`AGENT_MANAGER_CRON_JOBS` override for tests) and
+  maps each agent's `source_job_ids` to schedule, state, last status/time,
+  next run and a truncated last error; stale ids are reported as `missing`
+  instead of silently dropped, and `count`/`live`/`missing` keep the totals
+  honest. `ws.list_agents`/`get_agent` attach `cron`; the status dot goes
+  `error` when the newest cron status is an error and newer than the last
+  recorded ws run. `/bot/` rail line 2 is now live `next <t> · N jobs`
+  (`untilTime`), the drawer Schedule section lists each job with name/id,
+  schedule, state, last status, next run and error (no seed schedule text or
+  duplicate Source jobs block). `tests/test_cron_sync.py` 17 tests +
+  `tests/test_ws_ui.py` 2 new contract tests; full suite 182 green. Live
+  evidence after restart: token `GET /api/ws/agents` returns 8 agents with
+  cron (health-auditor 5/5 live, next 99eb38de9bb7, last ok), detail lists all
+  5 jobs, `POST /api/ws/agents/health-auditor/run` on device-recon
+  (99eb38de9bb7, no_agent, deliver local) returned 200, runner rc 0, run
+  recorded ok at 14:56, next run advanced to 15:56; `/bot/` 200 serving the
+  cron markers. Deviation: schedule strings come verbatim from
+  `schedule_display` (some jobs store raw cron exprs, e.g. `0 */6 * * *`); no
+  formatting layer added. Run now was verified on the script job rather than
+  the LLM digest so no duplicate Telegram delivery was produced.

@@ -325,6 +325,15 @@ function relTime(ts) {
   return Math.floor(s / 86400) + 'd ago';
 }
 
+function untilTime(ts) {
+  if (!ts) return '';
+  const s = Math.max(0, Number(ts) - Date.now() / 1000);
+  if (s < 60) return 'now';
+  if (s < 3600) return Math.floor(s / 60) + 'm';
+  if (s < 86400) return Math.floor(s / 3600) + 'h';
+  return Math.floor(s / 86400) + 'd';
+}
+
 function clock(ts) {
   if (!ts) return '';
   const d = new Date(Number(ts) * 1000);
@@ -359,10 +368,18 @@ function groupFor(slug) {
   return 'On-demand';
 }
 
+function cronNext(c) {
+  if (!c || !c.count) return 'on demand';
+  if (c.next_run_ts) return 'next ' + untilTime(c.next_run_ts);
+  if (!c.live) return 'no cron job';
+  if (c.live && c.paused === c.live) return 'paused';
+  return 'no next run';
+}
+
 function agentRow(a) {
   const st = a.status || 'idle';
-  const last = a.last_run ? relTime(a.last_run.ended_at || a.last_run.started_at) : 'never run';
-  const sub = (a.schedule || 'on demand') + ' · ' + last;
+  const c = a.cron || {};
+  const sub = cronNext(c) + (c.count > 1 ? ' · ' + c.count + ' jobs' : '');
   return '<button type="button" class="agent-row" data-slug="' + esc(a.slug) + '">' +
     '<span class="avatar" style="--c:' + esc(a.color || '#8b949e') + '">' + esc(a.avatar || '') + '</span>' +
     '<span class="ar-main"><span class="ar-name">' + esc(a.name) +
@@ -477,13 +494,30 @@ function runRow(r) {
     (r.summary ? '<p class="run-sum">' + esc(r.summary.slice(0, 400)) + '</p>' : '') + '</div>';
 }
 
+function cronRow(j) {
+  if (j.missing) {
+    return '<div class="run"><div class="run-top"><span class="st error">missing</span>' +
+      '<span>' + esc(j.id) + '</span></div>' +
+      '<p class="mono">not in the cron registry</p></div>';
+  }
+  const cls = j.last_status === 'error' ? 'error' : (j.last_status === 'ok' ? 'ok' : '');
+  return '<div class="run"><div class="run-top"><span class="st ' + cls + '">' +
+    esc(j.last_status || 'never run') + '</span><span>' + esc(j.schedule || '') +
+    '</span><span>' + esc(j.state || '') + '</span></div>' +
+    '<p class="mono">' + esc(j.name || '') + ' · ' + esc(j.id) + '</p>' +
+    '<p class="mono">' + (j.last_run_ts ? 'last ' + esc(relTime(j.last_run_ts)) : 'never run') +
+      (j.next_run_ts ? ' · next ' + esc(untilTime(j.next_run_ts)) : '') + '</p>' +
+    (j.last_error ? '<p class="run-sum">' + esc(j.last_error.slice(0, 200)) + '</p>' : '') +
+    '</div>';
+}
+
 function renderDrawer() {
   const runs = CURRENT.runs || [];
-  const jobs = CURRENT.source_job_ids || [];
+  const jobs = (CURRENT.cron && CURRENT.cron.jobs) || [];
   $('#drawer-body').innerHTML =
-    '<div class="sect"><h3>Schedule</h3><p>' + esc(CURRENT.schedule || 'on demand') + '</p></div>' +
-    '<div class="sect"><h3>Source jobs</h3><p class="mono">' +
-      (jobs.length ? jobs.map(esc).join('<br>') : 'none') + '</p></div>' +
+    '<div class="sect"><h3>Schedule</h3>' +
+      (jobs.length ? jobs.map(cronRow).join('')
+                   : '<p class="mono">on demand (no cron job)</p>') + '</div>' +
     '<div class="sect"><h3>Runs</h3>' + (runs.length ? runs.map(runRow).join('') :
       '<p class="mono">No runs recorded.</p>') + '</div>' +
     '<div class="sect"><h3>Prompt</h3><textarea id="prompt" maxlength="4000"></textarea>' +
@@ -532,6 +566,7 @@ async function refreshAgent() {
   if (i >= 0) AGENTS[i] = Object.assign({}, AGENTS[i], {
     status: CURRENT.status, last_run: CURRENT.last_run,
     schedule: CURRENT.schedule, enabled: CURRENT.enabled,
+    cron: CURRENT.cron,
   });
   renderRail();
   document.querySelectorAll('.agent-row').forEach(b => {

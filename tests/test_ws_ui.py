@@ -62,7 +62,21 @@ class BotPageShell(unittest.TestCase):
         self.assertIn("/api/ws/agents/", self.html)
         self.assertIn("method:'PATCH'", self.html.replace(" ", ""))
         self.assertIn("system_prompt", self.html)
-        self.assertIn("source_job_ids", self.html)
+        self.assertIn("CURRENT.cron", self.html)
+
+    def test_rail_shows_live_cron_next_run(self):
+        # The rail line is derived from the live cron registry (next run +
+        # job count), not from the seed's static schedule string.
+        self.assertIn("a.cron", self.html)
+        self.assertIn("next_run_ts", self.html)
+        self.assertIn("function untilTime", self.html)
+        self.assertIn("function cronNext", self.html)
+
+    def test_drawer_lists_live_cron_jobs(self):
+        self.assertIn("function cronRow", self.html)
+        self.assertIn("not in the cron registry", self.html)
+        self.assertIn("j.last_status", self.html)
+        self.assertIn("j.next_run_ts", self.html)
 
     def test_select_agent_resets_to_chat_tab(self):
         # Picking an agent while the Peers tab is open must switch the pane

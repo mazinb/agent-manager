@@ -12,7 +12,7 @@ import re
 import time
 import uuid
 
-from . import llm
+from . import cron_sync, llm
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEED_PATH = os.path.join(ROOT, "agents_seed.json")
@@ -192,7 +192,7 @@ def _last_run(con, agent_id):
     }
 
 
-def _status(con, agent_id, last_run):
+def _status(con, agent_id, last_run, cron=None):
     running = con.execute(
         "SELECT 1 FROM ws_runs WHERE agent_id=? AND status='running' LIMIT 1",
         (agent_id,)).fetchone()
@@ -200,24 +200,33 @@ def _status(con, agent_id, last_run):
         return "running"
     if last_run and last_run["status"] == "error":
         return "error"
+    if cron and cron.get("last_status") == "error":
+        cron_ts = cron.get("last_run_ts") or 0
+        run_ts = ((last_run["ended_at"] or last_run["started_at"])
+                  if last_run else 0)
+        if cron_ts >= run_ts:
+            return "error"
     return "idle"
 
 
-def list_agents(con):
+def list_agents(con, cron_path=None):
     _ensure(con)
+    cron = cron_sync.load(cron_path)
     out = []
     for r in con.execute(
             "SELECT id, slug, name, purpose, avatar, color, schedule, enabled,"
             " source_job_ids, updated_at FROM ws_agents"
             " ORDER BY created_at, slug"):
         last = _last_run(con, r["id"])
+        live = cron_sync.summarize(_json_list(r["source_job_ids"]), cron)
         out.append({
             "id": r["id"], "slug": r["slug"], "name": r["name"],
             "purpose": r["purpose"], "avatar": r["avatar"],
             "color": r["color"], "schedule": r["schedule"],
             "enabled": bool(r["enabled"]),
             "source_job_ids": _json_list(r["source_job_ids"]),
-            "status": _status(con, r["id"], last),
+            "cron": live,
+            "status": _status(con, r["id"], last, live),
             "last_run": last,
             "updated_at": r["updated_at"],
         })
@@ -463,11 +472,14 @@ def patch_agent(con, slug, **fields):
     return _agent_row(con, slug)
 
 
-def get_agent(con, slug):
+def get_agent(con, slug, cron_path=None):
     _ensure(con)
     agent = _agent_row(con, slug)
     last = _last_run(con, agent["id"])
-    agent["status"] = _status(con, agent["id"], last)
+    live = cron_sync.summarize(agent["source_job_ids"],
+                               cron_sync.load(cron_path))
+    agent["cron"] = live
+    agent["status"] = _status(con, agent["id"], last, live)
     agent["last_run"] = last
     agent["messages"] = list_messages(con, slug, limit=50)
     agent["runs"] = list_runs(con, slug, limit=20)

@@ -2,6 +2,14 @@
 
 Moved from the root README so agent instructions stay crisp.
 
+- **2026-11-25** — **Agents workspace live cron sync:** `agent_context/cron_sync.py`
+  reads `~/.hermes/cron/jobs.json` read-only and maps each agent's
+  `source_job_ids` to schedule, state, last status/time, next run and last
+  error; stale ids surface as `missing` instead of disappearing. `ws` list and
+  detail attach the live `cron` block and flag the status dot when the newest
+  cron status is an error. `/bot/` rail shows `next <t> · N jobs` and the
+  drawer Schedule section lists every job with its live state, last status,
+  next run and error. Tests `tests/test_cron_sync.py`.
 - **2026-11-25** — **Agents workspace UI (`/bot/`):** mobile-first workspace
   at `bot.getzoro.com/bot/` over the ws API: grouped agent rail
   (Operations/Labs/On-demand), per-agent thread, server-composed composer
